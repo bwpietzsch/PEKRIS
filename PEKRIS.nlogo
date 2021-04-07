@@ -456,6 +456,7 @@ to grow
       set size 2
     ]
 
+    ; growth of adult krill
     ask debkrill-here [
       ifelse (l > 11 * 0.2) [
         determine_fluxes fr          ; fluxes deterimend after Jager et al. 2015
@@ -468,7 +469,8 @@ to grow
       set chla (chla - (JA / 48))
     ]
 
-     ask clutches-here [
+    ; growth of larvae krill
+    ask clutches-here [
       if age > 30 [
         ifelse (l > 11 * 0.2) [
           determine_fluxes fr        ; fluxes deterimend after Jager et al. 2015
@@ -529,43 +531,43 @@ to determine_fluxes [frac]
         set JV (JV + JR)                  ; mass flux for structure
         set JR 0                          ; mass flux to reproduction buffer
         ifelse ( WR > abs (JV)) [
-          set WR (WR + JV)                ; mass of reproduction buffer in adult
-          set JV 0                        ; mass flux for structure
+          set WR (WR + JV)                          ; mass of reproduction buffer in adult
+          set JV 0                                  ; mass flux for structure
         ][; respiration cannot be covered by assimilated carbon and reproduction buffer,
           ; than krill shrink (WV is getting smaller since JV is negative
-          set JV (JV + WR)                ; mass flux for structure
-          set WR 0                        ; mass of reproduction buffer in adult
-          set WV (WV + JV)                ; mass of sturctural body
-          set JV 0                        ; mass flux for structure
+          set JV (JV + WR)                          ; mass flux for structure
+          set WR 0                                  ; mass of reproduction buffer in adult
+          set WV (WV + JV)                          ; mass of sturctural body
+          set JV 0                                  ; mass flux for structure
           set starvation-days (starvation-days + 1) ; increase counter for starvation
         ]
       ]
     ]
   ][; fluxes during summer
-    let JaAm 0.044                        ; maximum area-specific assimilation rate (ma/(l^2*t))
-    set JA frac * JaAm * L ^ 2 * tempdep  ; assimilation flux
-    let JVM 0.0032                        ; volume specific maintenance cost (ma/(l^3*t))
-    set JM JVM * L ^ 3 * tempdep          ; maintenance flux
-    let YVA 0.8                           ; yield of ssimilates on structure, value by Jager et al.
-    let kappa 0.8                         ; fraction of assimilation flux for soma, value by Jager et al.
-    set JV (YVA * (kappa * JA - JM))      ; mass flux for structure
-    set JR ((1 - kappa) * JA)             ; mass flux for reproduction buffer
+    let JaAm 0.044                          ; maximum area-specific assimilation rate (ma/(l^2*t))
+    set JA (frac * JaAm * L ^ 2 * tempdep)  ; assimilation flux
+    let JVM 0.0032                          ; volume specific maintenance cost (ma/(l^3*t))
+    set JM (JVM * L ^ 3 * tempdep)          ; maintenance flux
+    let YVA 0.8                             ; yield of assimilates on structure, value by Jager et al.
+    let kappa 0.8                           ; fraction of assimilation flux for soma, value by Jager et al.
+    set JV (YVA * (kappa * JA - JM))        ; mass flux for structure
+    set JR ((1 - kappa) * JA)               ; mass flux for reproduction buffer
     if (JV < 0) [
       let delta JV
       ifelse (JR > abs (delta)) [
-        set JV 0                          ; mass flux for structure
-        set JR (JR + delta)               ; mass flux to reproduction buffer
+        set JV 0                                    ; mass flux for structure
+        set JR (JR + delta)                         ; mass flux to reproduction buffer
       ][
-        set JV (JV + JR)                  ; mass flux for structure
-        set JR 0                          ; mass flux for reproduction buffer
+        set JV (JV + JR)                            ; mass flux for structure
+        set JR 0                                    ; mass flux for reproduction buffer
         ifelse (WR > abs (JV)) [
-          set WR (WR + JV)                ; mass of reproduction buffer in adult
-          set JV 0                        ; mass flux for structure
+          set WR (WR + JV)                          ; mass of reproduction buffer in adult
+          set JV 0                                  ; mass flux for structure
         ][
-          set JV (JV + WR)                ; mass flux for structure
-          set WR 0                        ; mass of reproduction buffer in adult
-          set WV (WV + JV)                ; mass of structural body
-          set JV 0                        ; mass flux for structure
+          set JV (JV + WR)                          ; mass flux for structure
+          set WR 0                                  ; mass of reproduction buffer in adult
+          set WV (WV + JV)                          ; mass of structural body
+          set JV 0                                  ; mass flux for structure
           set starvation-days (starvation-days + 1) ; increase starvation counter
         ]
       ]
@@ -804,7 +806,7 @@ to death
   ; krill dies after 8 years or due to daily mortality
   ask debkrill [
     set age (age + 1)
-    if (age > (8 * 365)) or (random-float 1 < (1 - debsurvival))[die]
+    if (age > (6 * 365)) or (random-float 1 < (1 - debsurvival))[die]
   ]
 
   ; To reduce computational effort in the beginning clutches are computed as cohorts.
@@ -1142,10 +1144,10 @@ PENS
 "pen-1" 1.0 0 -13840069 true "" "plot max [chla] of patches / resolution"
 
 PLOT
-247
-460
-507
-748
+340
+465
+605
+745
 Histogram Oozoids lengths (cm)
 NIL
 NIL
@@ -1160,10 +1162,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-517
-462
-768
-748
+610
+465
+861
+745
 Histogram Blastozoids lengths (cm)
 NIL
 NIL
@@ -1283,11 +1285,11 @@ starvation
 30.0
 1
 1
-NIL
+d
 HORIZONTAL
 
 PLOT
-251
+339
 755
 754
 970
@@ -1313,7 +1315,7 @@ DailyMort
 DailyMort
 0
 1
-0.02
+0.025
 0.001
 1
 NIL
@@ -1328,7 +1330,7 @@ grazing_factor
 grazing_factor
 0
 2
-0.003
+0.0025
 0.001
 1
 NIL
@@ -1337,7 +1339,7 @@ HORIZONTAL
 SLIDER
 10
 620
-182
+180
 653
 vegetation_delay
 vegetation_delay
@@ -1346,7 +1348,7 @@ vegetation_delay
 45.0
 1
 1
-NIL
+d
 HORIZONTAL
 
 BUTTON
@@ -1355,7 +1357,7 @@ BUTTON
 95
 133
 ref-values
-set starvation 30\nset dailymort 0.02\nset grazing_factor 0.003\nset vegetation_delay 45\nset immiprob 0.0085\nset rchla 0.25\nset deltachla 0.05\nset halfsat 0.2\nset HibernationFactor 0.2\nset ni 10\nset const_food 1\nset sizeofmigra 3\nset N_krill 10\nset oozoid_resp 0.05\nset blasto_resp 0.15
+set starvation 30\nset dailymort 0.025\nset grazing_factor 0.0025\nset vegetation_delay 45\nset immiprob 0.0085\nset rchla 0.25\nset deltachla 0.05\nset halfsat 0.2\nset HibernationFactor 0.2\nset ni 10\nset const_food 1\nset sizeofmigra 3\nset N_krill 10\nset oozoid_resp 0.05\nset blasto_resp 0.15
 NIL
 1
 T
@@ -1385,10 +1387,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-794
-464
-1179
-744
+865
+465
+1250
+745
 Seasonal repoduction cycles
 NIL
 NIL
@@ -1627,13 +1629,13 @@ NIL
 HORIZONTAL
 
 SWITCH
-9
-280
-112
-313
+10
+235
+113
+268
 salps?
 salps?
-1
+0
 1
 -1000
 
@@ -1707,10 +1709,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot maxspawn"
 
 SLIDER
-245
-985
-417
-1018
+350
+980
+522
+1013
 oozoid_resp
 oozoid_resp
 0
@@ -1722,10 +1724,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-245
-1030
-417
-1063
+350
+1025
+522
+1058
 blasto_resp
 blasto_resp
 0
@@ -1766,13 +1768,154 @@ max_gen
 11
 
 MONITOR
-175
-435
-232
-480
+10
+275
+67
+320
 C°
 (cos ((ticks) / 365 * 360) * 2 + 273) - 273
 2
+1
+11
+
+TEXTBOX
+190
+490
+340
+508
+for salps from Groene
+12
+0.0
+1
+
+TEXTBOX
+190
+540
+340
+558
+for all from Groene
+12
+0.0
+1
+
+TEXTBOX
+190
+585
+340
+603
+for all from Groene
+12
+0.0
+1
+
+TEXTBOX
+190
+630
+340
+648
+for all from Groene
+12
+0.0
+1
+
+TEXTBOX
+190
+675
+340
+693
+for salps from Groene
+12
+0.0
+1
+
+TEXTBOX
+185
+705
+335
+735
+Chla production from Groene
+12
+0.0
+1
+
+TEXTBOX
+185
+750
+335
+785
+Chla decay from Groene
+12
+0.0
+1
+
+TEXTBOX
+185
+800
+335
+818
+for all from Groene
+12
+0.0
+1
+
+TEXTBOX
+185
+850
+335
+868
+for Krill from ?
+12
+0.0
+1
+
+TEXTBOX
+185
+895
+335
+913
+for salps from Groene
+12
+0.0
+1
+
+TEXTBOX
+185
+930
+335
+960
+max Chla if const food from Groene
+12
+0.0
+1
+
+TEXTBOX
+185
+975
+335
+993
+for Salps from Groene
+12
+0.0
+1
+
+TEXTBOX
+185
+1020
+335
+1038
+for Krill from ?
+12
+0.0
+1
+
+MONITOR
+150
+435
+220
+480
+# krill
+(count debkrill) + (round (sum [number] of clutches))
+17
 1
 11
 
