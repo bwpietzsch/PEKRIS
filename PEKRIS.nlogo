@@ -12,33 +12,31 @@ breed [clutches clutch]        ; eggs and early stages modelled as cohorts to re
 patches-own [chla]
 
 globals [
-  gr-o
-  gr-b
-  maxn
-  monthlycount
-  rc
-  rc_max
-  ratio-list
-  fitness
-  maxlo
-  maxlb
-  temp_factor
+  gr-o                      ; list where growth rates of oozoids are stored
+  gr-b                      ; list where growth rates of blastozoids are stored
+  maxn                      ; maximum number of salps
+  monthlycount              ; list that stores the intra-annual distribution of salp abundances
+  rc                        ; generation time counter
+  rc_max                    ; maximum number of reproductive cycles in a season
+  ratio-list                ; list where ratio of oozoids and blastozoids are stored
+  maxlo                     ; maximum length of oozoids
+  maxlb                     ; maximum length of blastozoids
+  temp_factor               ; based on the temperature physiological processes are reduced
   chlaK
-  peakabundance
-  peakabundancelist
-  max_gen
-  n_oozoids
-  n_blasto
-  resolution
-  immigrationtime
-  immigrationtimelist
-  survivalevents
-  regenerationtimelist
-  peakimmigrationtime
-  migrationevent?
-  T
-  debsurvival
-  maxspawn
+  peakabundance             ; this variable stores the maximum abundance during a season
+  peakabundancelist         ; this list stores the abundance peak in each season
+  max_gen                   ; this variable stores the number of reproductive cycles of salps in one season
+  n_oozoids                 ; number of oozoids in the world
+  n_blasto                  ; number of blastozoids in the world
+  resolution                ; this defines how much m^3 are represented by one patch - important for the amount of food one animal can access per day
+  immigrationtime           ; this variable stores the time when salps occur in the season
+  immigrationtimelist       ; this list stores the time when salps enter the arena
+  regenerationtimelist      ; this list stores the time between the first chain release and the last chain release of oozoids
+  peakimmigrationtime       ; this variable store the maximum immigration time during a season
+  migrationevent?           ; true if a migration event happened during this season
+  T                         ; daily temperature (Kelvin)
+  debsurvival               ; biomass dependent krill survival
+  maxspawn                  ; maximum spawn events of single krill
 ]
 
 oozoids-own [
@@ -77,668 +75,757 @@ chains-own [
 ]
 
 debkrill-own [             ; follows the notation of Jager et al. 2015
-  WV
-  WB
-  WR
-  L                        ; structural body lengh in mm
-  JA
-  JM
-  JV
-  JR
-  spawningevent
-  age
-  ageoffirstrepro
-  starvation-days
+  WV                       ; structural body mass (mg dry weight)
+  WB                       ; assimilate buffer in egg (mg dry weight)
+  WR                       ; build-up of reproduction buffer (mg dry weight)
+  L                        ; structural body length (mm), divide by 0.2 to get real length
+  JA                       ; assimilation (mg dry weight per day)
+  JM                       ; somativ maeintenance (mg dry weight per day)
+  JV                       ; structural growth (mg dry weight per day)
+  JR                       ; investment reproduction buffer (mg dry weight per day)
+  spawningevent            ; number of spawning events
+  age                      ; age (days)
+  ageoffirstrepro          ; age of first reproduction (days)
+  starvation-days          ; counts days where respiration cannot be fullfilled
 ]
 
-; reproduction will be computational problematic. This is why I model that as clutches
-; this needs to be changed if direct interaction between krill and salps will be modelled
 clutches-own [
-  WV
-  WB
-  WR
-  L                       ; structural body length in mm
-  JA
-  JM
-  JV
-  JR
-  spawningevent
-  age
-  ageoffirstrepro
-  number
-  starvation-days
+  ; reproduction will be computational problematic. This is why I model that as clutches
+  ; this needs to be changed if direct interaction between krill and salps will be modelled
+  WV                       ; structural body mass (mg dry weight)
+  WB                       ; assimilate buffer in egg (mg dry weight)
+  WR                       ; build-up of reproduction buffer (mg dry weight)
+  L                        ; structural body length (mm)
+  JA                       ; assimilation (mg dry weight per day)
+  JM                       ; somativ maeintenance (mg dry weight per day)
+  JV                       ; structural growth (mg dry weight per day)
+  JR                       ; investment reproduction buffer (mg dry weight per day)
+  spawningevent            ; number of spawning events
+  age                      ; age in days
+  ageoffirstrepro          ; age of first reproduction (days)
+  number                   ; number of juveniles in the clutch
+  starvation-days          ; counts days where respiration cannot be fullfilled
 ]
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; setup procedure                     ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; model setup ---------------------------------------------------------------------------------------------------
 to setup
 
-  ca; resets everything
+  ca         ; resets everything
+  file-close ; make sure there is no file still open
 
-  file-close; make sure there is no file still open
-
-  set immigrationtime 0; this variable stores the time when salps occur in the season
-
-  set max_gen 0; this variable stores the number of reproductive cycles of salps in one season
-
-  set resolution 16; this defines how much m^3 are represented by one patch - this is important for the amount of food one animal can access per day
-
-  if (not file-exists? "chla.txt")[stop]; chla.txt stores a time series of chla values from a lognormal distribution based on the amlr data from crhistian reiss and colleagues
-
-  let nstar 0; nstar is the max chla value in the season
-
-  ifelse (PPMode = "Lognorm") ; if this path is taken, than the chla (food) amount will vary in time and is read in from a text file
-  [
-    file-open "chla.txt"; text file with time series of chla values
-
-    ifelse (file-at-end?); if file is at the end the simulation stops
-    [
-      stop
-    ]
-    [ ; if not a new value is read in - the calculation below makes sure that this value will be reached - deltachla is the decay rate of chla per day and rchla is the growth rate of chla
-      set nstar (read-from-string file-read-line) / 100
-      set chlaK nstar / ( 1 - deltachla / rchla)
-    ]
-  ]
-  [
-    set chlaK const_food / ( 1 - deltachla / rchla); this is the path with const max chla each year - the maximum would be than const_food each each
-    set nstar const_food
-  ]
-
-  ask patches [ set chla nstar * resolution]; each patch will contain this amount of chla, this depends on the resolution, i.e. how much m^3 are represented by one patch
-
-  set peakabundance 0; this variable should store the maximum abundance during a season
-  set peakabundancelist []; this list stores the abundance peak in each season
-  set immigrationtimelist []; this list stores the time when salps enter the arena
-  set regenerationtimelist []; this list stores the time between the first chain release and the last chain release of oozoids
-
-  set temp_factor 1; based on the temperature physiological processes are reduced
-
-  set rc 0 ; generation time counter
-  set rc_max 0; maximum number of reproductive cycles in a season
+  set peakabundancelist []    ; this list stores the abundance peak in each season
+  set immigrationtimelist []  ; this list stores the time when salps enter the arena
+  set regenerationtimelist [] ; this list stores the time between the first chain release and the last chain release of oozoids
 
   set monthlycount [0 0 0 0 0 0 0 0 0 0 0 0]; here the intraannual distribution of salp abundances will be stored
 
-  set maxn 0; maximum number of salps
-  set maxlo 0 ; maximum length of oozoids
-  set maxlb 0 ; maximum length of blastozoids
+  set gr-o []; list for oozoid growth rates
+  set gr-b []; list for blastozoid growth rates
+  set ratio-list [] ; list for ratio of oozoids and blastozoids
 
-  set gr-o []; list where growth rates of oozoids are stored
-  set gr-b []; list where growth rates of blastozoids are stored
-  set ratio-list [] ; list where ratio of oozoids and blastozoids are stored
+  set resolution 16 ; one patch resembles 16 m^3 of water
 
+  ; calculation of chlorophyl a values ---------------------------------------------------------------------------------------------------------------;
 
-  ask patches [set pcolor scale-color  green chla 0 1 ]; set color of patches depending on chla content
-  set-default-shape oozoids "default"; shape of oozoids
-  set-default-shape blastozoids "default"; shape of blastozoids
+  let nstar 0 ; nstar is the max chla value in the season
 
-  ; creat two oozoids wiht body length l = 2 cm, the carbon weight cw is calculated according to an equation provided by Henschke et al 2018, and an initial value is attributed to the reproductive storage reprobuffer
-  create-oozoids 2 [set number 1 set l 2 set size 2 set color 47 + random-float 2 - 1 set oozoid-repro-events 0 set generation 0 set grown true set cw (l * 10 / 17) ^(1 / 0.4) set reprobuffer cw / 4]
-
-  set n_oozoids count oozoids; number of oozoids
-  set n_blasto 0; number of blastozoids
-
-  set migrationevent? true; this boolean is true if in that season a migration event has happened
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; N_krill krill will be initialized, with initial Length of 1.7 mm value is given by Ikeda 1984 J. Exp. Mar. Biol. Ecol., which is C1 stage with 30 days of age
-
-  create-debkrill N_krill
-  [
-
-   set L 0.34  ; structural length in mm, to get to the real length one has to divide by 0.2
-   set WV 0.22 * ( L) ^ 3 ; structural body mass
-   set WB 0.0; Assimilate buffer in egg - this is from Jager et al. 2015
-   set WR 0 ; Build-up of reproduction buffer
-   set spawningevent 0; number of spawning events
-   set age 30; age in days
-   set ageoffirstrepro 0; age of first reproduction
-   setxy random-xcor random-ycor; random location
-   set starvation-days 0
+  ; using a lognormal distribution based on the amlr data from christion reiss and colleagues
+  ifelse (PPMode = "Lognorm") [ ; if this path is taken, than the chla (food) amount will vary in time and is read in from a text file
+    if (not file-exists? "chla.txt")[stop] ; stops procedure if no file for import exists
+    file-open "chla.txt"; opens file for import
+    ifelse (file-at-end?) [
+      stop ; if file is at the end the simulation stops
+    ][
+      set nstar (read-from-string file-read-line) / 100 ; a new value is read in
+      set chlaK nstar / ( 1 - deltachla / rchla) ; deltachla is the decay rate of chla per day & rchla is the growth rate of chla
+    ]
+  ][
+    ; this is the path with const max chla each year - the maximum would be than const_food each each
+    set chlaK const_food / ( 1 - deltachla / rchla)
+    set nstar const_food
   ]
 
-  set debsurvival 1; krill survival is dependent on the biomass krill assuming that predators will be attracted by krill - the survival is updated in the update patch routine
-  set maxspawn 0; maximum spawn events of single krill
-  reset-ticks; starting the netlogo clock
+  ask patches [
+    set chla nstar * resolution            ; calculates amount of chla for each patch
+    set pcolor scale-color  green chla 0 1 ; set color depending on chla content
+  ]
+
+  ; creation of oozoids ----------------------------------------------------------------------------------------------------------------------------- ;
+
+  create-oozoids 2 [                    ; creates 2 oozoids
+    set number 1                        ; 1 individual
+    set l 2                             ; body length l = 2 cm
+    set size 2                          ; size as depicted in NetLogo
+    set color 47 + random-float 2 - 1   ; randomly vary color
+    set oozoid-repro-events 0           ; no chains released so far
+    set generation 0                    ; no generation this season so far
+    set grown true                      ; obsolete variable?
+    set cw (l * 10 / 17) ^(1 / 0.4)     ; carbon weight cw is calculated according to an equation provided by Henschke et al 2018
+    set reprobuffer cw / 4              ; an initial value is attributed to the reproductive storage reprobuffer
+  ]
+
+  set n_oozoids count oozoids ; number of oozoids
+
+  set migrationevent? true ; this boolean is true if in that season a migration event has happened
+
+  ; creation of krill ------------------------------------------------------------------------------------------------------------------------------- ;
+
+  create-debkrill N_krill [      ; create N_krill
+    set L 0.34                    ; structural length of 1.7 mm - C1 stage with 30 days of age (Ikeda 1984 J. Exp. Mar. Biol. Ecol.)
+    set WV 0.22 * ( L) ^ 3        ; structural body mass
+    set WB 0.0                    ; no assimilate buffer in egg so far
+    set WR 0                      ; no reproduction buffer so far
+    set spawningevent 0           ; no spawning events so far
+    set age 30                    ; age in days
+    set ageoffirstrepro 0         ; no reproduction so far
+    setxy random-xcor random-ycor ; random location
+    set starvation-days 0         ; no starvation so far
+  ]
+
+  set debsurvival 1 ; set biomass dependent krill survival to 1
+  set maxspawn 0    ; maximum spawn events of single krill
+
+  reset-ticks       ; update all plots and start the NetLogo clock
 
 end
 
-
-
-; in the go procuedure the main procedures are called
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; go procedure                        ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to go
 
   if (ticks >= 100000 OR count debkrill <= 0) [stop]; simulation stops either after it has reached its time span or all krill have died
 
-  if (any? (turtle-set oozoids chains blastozoids)); if any salps are around determine the highest generation time reflecting the number of life cycles
-  [
-    set max_gen max list max_gen (max [generation] of (turtle-set oozoids blastozoids chains))
+  let salp-set (turtle-set oozoids chains blastozoids) ; create turtle-set of all present salp life stations
+  if (any? salp-set) [                                 ; check if any salps are around
+    set max_gen (max [generation] of (salp-set ))      ; store the highest generation time reflecting number of life cycles
   ]
 
-  if ( ticks mod 365 = 180) ; in the middle of the winter determine the largest generation time of the last season - end of june
-  [
-    detreprocyclesalp
+  if (ticks mod 365 = 180) [  ; in the middle of the winter - end of june
+    detreprocyclesalp         ; determine the largest generation time of the last season
   ]
 
+  grow               ; determine growth in body length
+  asexual_repro      ; asexual reproduction of salps (oozoids)
+  sexual-repro       ; sexual reproduction of krill and salps (blastozoids)
+  death              ; mortality
 
-  grow; determine growth in body length
-  asexual_repro; asexual reproduction of salps (oozoids)
-  sexual-repro; sexual reproduction of krill and salps (blastozoids)
-  death; mortality
-
-  if salps? = true ; if salps should be simulated than the immigration of salps into the simulation arena is modelled
-  [
-    immigration
+  if salps? = true [ ; should salps be simulated?
+    immigration      ; immigration of salps into the simulation arena
   ]
-  update-patches; patches will be updated, chla content also the density dependent survival of krill is determined here
-  move; random walk of krill and salps
 
-  do_graphs; do graphs
+  update-patches     ; patches will be updated (e.g. chla content, density dependent krill survival)
+  move               ; random walk of krill and salps
 
-  tick ; advance time step by one
+  do_graphs          ; update plots
+  tick               ; advance time step by one
 
 end
 
-; in the grow procedure the change in body length will be calculated for all animals, this is done for each patch checking whether there is enough food available or not
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; store amount of reproductive cycles ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to detreprocyclesalp
+
+  set rc max_gen                    ; store max amount of repro cycles
+  if (rc > rc_max) [set rc_max rc]  ; correct amount of repro cycles to maximum possible
+  set max_gen 0                     ; set max-gen to 0
+
+  ; set generation of all life cycles of salp to 0
+  ask (turtle-set blastozoids oozoids chains) [
+    set generation 0
+  ]
+
+  ; update Plot on reproduction cycles
+  set-current-plot "Seasonal repoduction cycles"
+  plot rc / 2
+
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; grow procedure                      ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to grow
 
-   set T cos ((ticks) / 365 * 360) * 2 + 273; determining a temperature based on the time of the year
+  ; in the grow procedure the change in body length will be calculated for all animals, this is done for each patch checking whether there is enough food available or not
 
-   set temp_factor exp (8000 / (2 + 273) - 8000 / T); Arrhenius temperature factor - matches well with the reported q10 of 2.8 -
+   set T (cos ((ticks) / 365 * 360) * 2 + 273)         ; set temperature based on time of year
+   set temp_factor (exp (8000 / (2 + 273) - 8000 / T)) ; Arrhenius temperature factor - matches well with the reported q10 of 2.8
+   let tempdep (exp (8000 / 273 - 8000 / T))           ; Arrhenius relation for krill, that can be potentially different than for salps
+   let dayt ticks mod 365                              ; day of the year - used for krill below
 
-   let tempdep exp ( 8000 / 273 - 8000 / ( T)) ; Arrhenius relation for krill, that can be potentially different than for salps
 
-   let dayt ticks mod 365; day of the year - used for krill below
+  ; the following procedures are conducted per patch - assuming this is the local area where individuals compete for ressources ------------------
+  ask patches [
 
-   ask patches ; the following procedures are conducted per patch - assuming this is the local area where individuals compete for ressources
-
-   [
-
-    let need 0
-
+    let need 0               ; need is the amount of food that all individuals on the patch want to consume
     let chla_control chla
-
     let chla_rescaled chla
 
     ; this is assuming that all animals have the same Holling Type II functional response, meaning having the same half saturation curve, which is certainly not true
     ; in essence it means more food is better for krill and salps which is debated
     ; below the need in a patch is calculated and if need is larger than the available food the uptake is restricted, i.e. it cannot be more food consumed than it is present
 
-    let fr (chla / resolution) / ( (chla / resolution) + halfsat); this is the Holling type II functional response that animals would have given enough ressources - this depends on the density of chla per m^3 and not the total amount
-
+    ; this is the Holling type II functional response (fr) that animals would have given enough ressources - this depends on the density of chla per m^3 and not the total amount
+    ; halfsat (!slider!, standard value: 0.2)
+    let fr (chla / resolution) / ( (chla / resolution) + halfsat)
     let fr-old fr
 
-    ask oozoids-here
-
-    [
-      set need need + temp_factor * number * (grazing_factor * fr * l ^ 2 ); for oozoids number is always one, the uptake of food depends on the squared body length
+    ask oozoids-here [
+      set need (need + temp_factor * number * (grazing_factor * fr * l ^ 2)) ; for oozoids number is always one, the uptake of food depends on the squared body length
     ]
 
-    ask blastozoids-here
-
-    [
-      set need need + temp_factor * number * (grazing_factor * fr * l ^ 2 ); for blastozoids number is always one, the uptake of food depends on the squared body length
+    ask blastozoids-here [
+      set need (need + temp_factor * number * (grazing_factor * fr * l ^ 2)) ; for blastozoids number is always one, the uptake of food depends on the squared body length
     ]
 
-    ask chains-here
-
-    [
-      set need need + temp_factor * number * (grazing_factor * fr * l ^ 2 ); for chains number can vary, since number represents the number of blastozoids in the chain
+    ask chains-here [
+      set need (need + temp_factor * number * (grazing_factor * fr * l ^ 2)) ; for chains number can vary, since number represents the number of blastozoids in the chain
     ]
 
     ; potential food uptake for krill
-
     let JAtemp 0
 
-    ask debkrill-here
-    [
-
-      ifelse (dayt > 90 and dayt < 270 and l > 30 * 0.2); this is unique to krill, if individuals are adults here l > 30 mm, than they can reduce metabolic activity during winter
-      [
-
-        let JaAm HibernationFactor * 0.044; the hibernationfactor changes the food uptake
-
-        set JAtemp fr * JaAM * L ^ 2 * tempdep; this would be the potential food uptake
-
-        set need need +  JAtemp / 48 ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
-      ]
-      [
-        let JaAm 0.044
-
-        set JAtemp fr * JaAM * L ^ 2 * tempdep; seems o.k.
-
-
-        set need need + JAtemp / 48 ;converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
+    ask debkrill-here [
+      ifelse (dayt > 90 and dayt < 270 and l > 30 * 0.2) [ ; this is unique to krill, if individuals are adults here l > 30 mm, than they can reduce metabolic activity during winter
+        ; HibernationFactor (!slider!, 0.2 standard value) changes the food uptake
+        let JaAm (HibernationFactor * 0.044)               ; JaAm: maximum area-specific assimilation rate (ma/(l^2*t))
+        set JAtemp (fr * JaAm * L ^ 2 * tempdep)           ; potential food uptake
+        set need (need + JAtemp / 48)                      ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
+      ][
+        let JaAm 0.044                                     ; JaAm: maximum area-specific assimilation rate (ma/(l^2*t))
+        set JAtemp (fr * JaAm * L ^ 2 * tempdep)           ; potential food uptake
+        set need (need + JAtemp / 48)                      ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
       ]
     ]
 
-    ask clutches-here
-    [
-
-      if (age > 30)
-      [
-        let JaAm 0.044
-
-        ; here uptake is multiplied by the number of small krill in the cohort
-
-        set JAtemp fr * JaAM * L ^ 2 * tempdep * number; seems o.k.
-
-
-        set need need + JAtemp / 48 ;
+    ask clutches-here [
+      if (age > 30) [
+        let JaAm 0.044                                    ; JaAm: maximum area-specific assimilation rate (ma/(l^2*t))
+        set JAtemp (fr * JaAm * L ^ 2 * tempdep * number) ; here uptake is multiplied by the number of small krill in the cohort
+        set need (need + JAtemp / 48)                     ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
       ]
-
     ]
 
-    if chla < need ; if more food is requested than available, than the functional response has to be updated
-    [
-      set fr fr * chla / need;
+    if chla < need [ ; if more food is requested than available, than the functional response has to be updated
+      set fr (fr * chla / need)
     ]
 
     ; growth of oozoids
-
-    ask oozoids-here
-    [
-
-      let carbon_assi temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
-      let carbon_growth 0.85 * carbon_assi; 85% of the carbon is allocated to growth
-      let carbon_repro 0.15 * carbon_assi; 15% of the carbon is allocated to reproduction
+    ask oozoids-here [
+      let carbon_assi (temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50) ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
+      let carbon_growth (0.85 * carbon_assi)                                  ; 85% of the carbon is allocated to growth
+      let carbon_repro (0.15 * carbon_assi)                                   ; 15% of the carbon is allocated to reproduction
       let oldl l
       let starvationlocal false
-
-      set chla chla - temp_factor * number * (grazing_factor * fr * l ^ 2); reduction in the overall available chla in the patch
-
-      let growth_resp temp_factor * oozoid_resp * cw; respiration costs
-
-      ifelse (growth_resp > carbon_growth); if respiration is higher than carbon allocated to growth
-
-      [
-        ifelse growth_resp < (carbon_growth + carbon_repro); if respiration can be covered by assimilated carbon
-        [
+      set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2))  ; reduction of the overall available chla in the patch
+      let growth_resp (temp_factor * oozoid_resp * cw)                        ; respiration costs
+      ifelse (growth_resp > carbon_growth) [                                  ; if respiration is higher than carbon allocated to growth
+        ifelse growth_resp < (carbon_growth + carbon_repro) [                 ; if respiration can be covered by assimilated carbon
           set carbon_repro (carbon_repro + carbon_growth - growth_resp)
           set carbon_growth 0
-        ]
-        [; if respiration can be covered by assimilated carbon and the reproduction storage
-          ifelse growth_resp < (carbon_growth + carbon_repro + reprobuffer)
-          [
+        ][; if respiration can be covered by assimilated carbon and the reproduction storage
+          ifelse growth_resp < (carbon_growth + carbon_repro + reprobuffer) [
             set carbon_growth 0
             set carbon_repro 0
             set reprobuffer (reprobuffer + carbon_growth + carbon_repro - growth_resp)
-
-          ]
-          [; respiration loss cannot be covered at all - animal starves
+          ][; respiration loss cannot be covered at all - animal starves
             set carbon_growth 0
             set carbon_repro 0
             set reprobuffer 0
             set starvationlocal true
           ]
+        ]
+      ][; if respiration is less than carbon allocation to growth
+        set carbon_growth (carbon_growth - growth_resp)
+        if (carbon_growth < 0) [user-message "carbon-growth"]
       ]
+      let oldcw cw                                                     ; this is for testing
+      set cw (cw + carbon_growth)                                      ; new growth
+      if (cw - oldcw < 0 ) [user-message "cw shrinkage"]               ; salps are not allowed to shrink
+      set reprobuffer ((1 - oozoid_resp) * reprobuffer + carbon_repro) ; reprobuffer is updated - here are respiration costs for the reproductive tissue calculated - this is not done in the DEB
+      set l ((17 * cw ^ 0.4) / 10)                                     ; conversion from carbon weight to body length - from an empirical relationship cited in Henschke et al. 2018
+      if (l - oldl < -0.00001) [
+        user-message word "l smaller than old l" (l - oldl)
+        user-message word "l " l
+        user-message word "oldl " oldl
+        user-message word "old cw" oldcw
+        user-message word "cw " cw
       ]
-      ; if respiration is less than carbon allocation to growth
-      [set carbon_growth carbon_growth - growth_resp if (carbon_growth < 0) [user-message "carbon-growth"]]
+      ifelse (starvationlocal = true) [
+        set starvation-days starvation-days + 1 ; increasing starvationday counter if animal could not fullfill respiration requirements
+        set grown false
+      ][
+        set grown true                          ; I do not use that anymore
+      ]
 
-      let oldcw cw; this is for testing
-
-      set cw cw + carbon_growth; new growth
-
-      if (cw - oldcw < 0 ) [user-message "cw shrinkage"]; salps are not allowed to shrink
-
-      set reprobuffer (1 - oozoid_resp) * reprobuffer + carbon_repro ; reprobuffer is updated - here are respiration costs for the reproductive tissue calculated - this is not done in the DEB
-
-      set l (17 * cw ^ 0.4) / 10; conversion from carbon weight to body length - from an empirical relationship cited in Henschke et al. 2018
-
-      if (l - oldl < -0.00001) [user-message word "l smaller than old l" (l - oldl) user-message word "l " l user-message word "oldl " oldl user-message word "old cw" oldcw user-message word "cw " cw]
-
-      ifelse (starvationlocal = true) [ set starvation-days starvation-days + 1 set grown false]; increasing starvationday counter if animal could not fullfill respiration requirements
-
-      [set grown true]; I do not use that anymore
-
-      if MeasureInc? [if (ticks < 5000 ) [ set gr-o lput (l - oldl) gr-o]]; measuring the increment in growth - this cannot be done through the complete simulation, because that would need to much memory space
-
-      set size 2; this is only how the agent is displayed.
-
-
+      if MeasureInc? [
+        if (ticks < 5000 ) [             ; limited duration of measurement because of memory issues
+         set gr-o lput (l - oldl) gr-o   ; measuring the increment in growth
+        ]
+      ]
+      set size 2 ; displayed agent size
     ]
 
-; same idea as above
-  ask blastozoids-here
-[
-
-
-      let carbon_assi temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50
-      let carbon_growth 0.8 * carbon_assi
-      let carbon_repro 0.2 * carbon_assi
+    ; growth of blastozoids
+    ask blastozoids-here [
+      let carbon_assi temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50  ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
+      let carbon_growth (0.8 * carbon_assi)                                  ; 85% of the carbon is allocated to growth
+      let carbon_repro (0.2 * carbon_assi)                                   ; 15% of the carbon is allocated to reproduction
       let oldl l
       let starvationlocal false
-
-      set chla chla - temp_factor * number * (grazing_factor * fr * l ^ 2)
-
-      let growth_resp temp_factor * blasto_resp * cw
-
-      ifelse (growth_resp > carbon_growth); if respiration is higher than carbon allocated to growth
-
-      [
-        ifelse growth_resp < (carbon_growth + carbon_repro); if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
-        [
+      set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2)) ; reduction of the overall available chla in the patch
+      let growth_resp (temp_factor * blasto_resp * cw)                       ; respiration costs
+      ifelse (growth_resp > carbon_growth) [                                 ; if respiration is higher than carbon allocated to growth
+        ifelse growth_resp < (carbon_growth + carbon_repro) [                ; if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
           set carbon_repro (carbon_repro + carbon_growth - growth_resp)
           set carbon_growth 0
-        ]
-        [; otherwise the animal does not grow and pays from the reprobuffer
-          ifelse growth_resp < (carbon_growth + carbon_repro + reprobuffer)
-          [
+        ][                                                                   ; otherwise the animal does not grow and pays from the reprobuffer
+          ifelse growth_resp < (carbon_growth + carbon_repro + reprobuffer) [
             set carbon_growth 0
             set carbon_repro 0
             set reprobuffer (reprobuffer + carbon_growth + carbon_repro - growth_resp)
-
-          ]
-          [
+          ][
             set carbon_growth 0
             set carbon_repro 0
             set reprobuffer 0
             set starvationlocal true
           ]
         ]
+      ][ ; if respiration is less than carbon allocation to growth
+        set carbon_growth (carbon_growth - growth_resp )
+        if (carbon_growth < 0) [user-message "carbon-growth"]
       ]
-      ; if respiration is less than carbon allocation to growth
-      [set carbon_growth carbon_growth - growth_resp if (carbon_growth < 0) [user-message "carbon-grwoth"]]
-
-      set cw cw + carbon_growth
-
-
-      set reprobuffer (1 - blasto_resp) * reprobuffer + carbon_repro
-      set l (17 * cw ^ 0.4) / 10
-
-      ifelse (starvationlocal = true) [ set starvation-days starvation-days + 1 ]
-
-      [];[set starvation-days starvation-days - 1 set grown true]
-
-      if MeasureInc? [if (ticks < 5000 ) [ set gr-b lput (l - oldl) gr-b]]
-
-      set size 2
-
-
-]
-
-; same idea as above
-  ask chains-here
-[
-
-
-      let carbon_assi temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50
-      let carbon_growth 0.85 * carbon_assi
-      let carbon_repro 0.15 * carbon_assi
-      let oldl l
-      let starvationlocal false
-
-      set chla chla - temp_factor * number * (grazing_factor * fr * l ^ 2)
-
-      let growth_resp temp_factor * blasto_resp * cw
-
-      ifelse (growth_resp > carbon_growth); if respiration is higher than carbon allocated to growth
-
-      [
-        ifelse growth_resp < (carbon_growth + carbon_repro); if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
-        [
-
-
-          set carbon_repro (carbon_repro + carbon_growth - growth_resp)
-          set carbon_growth 0
-
-
-        ]
-        [; otherwise the animal does not grow and pays from the reprobuffer
-          ifelse growth_resp < (carbon_growth + carbon_repro + reprobuffer)
-          [
-            set carbon_growth 0
-            set carbon_repro 0
-            set reprobuffer (reprobuffer + carbon_growth + carbon_repro - growth_resp)
-
-          ]
-          [
-            set carbon_growth 0
-            set carbon_repro 0
-            set reprobuffer 0
-            set starvationlocal true
-          ]
+      set cw (cw + carbon_growth)
+      set reprobuffer ((1 - blasto_resp) * reprobuffer + carbon_repro)
+      set l ((17 * cw ^ 0.4) / 10)
+      ifelse (starvationlocal = true) [
+        set starvation-days (starvation-days + 1)
+      ][]
+      if MeasureInc? [
+        if (ticks < 5000 ) [
+          set gr-b (lput (l - oldl) gr-b)
         ]
       ]
-      ; if respiration is less than carbon allocation to growth
-      [set carbon_growth carbon_growth - growth_resp if (carbon_growth < 0) [user-message "carbon-grwoth"]]
-
-      set cw cw + carbon_growth
-
-
-      set reprobuffer (1 - blasto_resp) * reprobuffer + carbon_repro
-      set l (17 * cw ^ 0.4) / 10
-
-      ifelse (starvationlocal = true) [ set starvation-days starvation-days + 1 ]
-
-      [];[set starvation-days starvation-days - 1 set grown true]
-
-      if MeasureInc? [if (ticks < 5000 ) [ set gr-b lput (l - oldl) gr-b]]
       set size 2
-
     ]
 
-    ask debkrill-here
-    [
-      ifelse (l > 11 * 0.2)
-      [
-        determine_fluxes fr; fluxes deterimend after Jager et al. 2015
+    ; growth of chains
+    ask chains-here [
+      let carbon_assi (temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50)
+      let carbon_growth (0.85 * carbon_assi)
+      let carbon_repro (0.15 * carbon_assi)
+      let oldl l
+      let starvationlocal false
+      set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2))
+      let growth_resp (temp_factor * blasto_resp * cw)
+      ifelse (growth_resp > carbon_growth) [                                   ; if respiration is higher than carbon allocated to growth
+        ifelse growth_resp < (carbon_growth + carbon_repro) [                  ; if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
+          set carbon_repro (carbon_repro + carbon_growth - growth_resp)
+          set carbon_growth 0
+        ][                                                                     ; otherwise the animal does not grow and pays from the reprobuffer
+          ifelse growth_resp < (carbon_growth + carbon_repro + reprobuffer) [
+            set carbon_growth 0
+            set carbon_repro 0
+            set reprobuffer (reprobuffer + carbon_growth + carbon_repro - growth_resp)
+          ][
+            set carbon_growth 0
+            set carbon_repro 0
+            set reprobuffer 0
+            set starvationlocal true
+          ]
+        ]
+      ][                                                                       ; if respiration is less than carbon allocation to growth
+        set carbon_growth (carbon_growth - growth_resp)
+        if (carbon_growth < 0) [user-message "carbon-growth"]
       ]
-      [
+      set cw (cw + carbon_growth)
+      set reprobuffer ((1 - blasto_resp) * reprobuffer + carbon_repro)
+      set l ((17 * cw ^ 0.4) / 10)
+      ifelse (starvationlocal = true) [
+        set starvation-days (starvation-days + 1)
+      ][]
+      if MeasureInc? [
+        if (ticks < 5000 ) [
+          set gr-b (lput (l - oldl) gr-b)
+        ]
+      ]
+      set size 2
+    ]
+
+    ask debkrill-here [
+      ifelse (l > 11 * 0.2) [
+        determine_fluxes fr          ; fluxes deterimend after Jager et al. 2015
+      ][
         determine_fluxes_larvae fr
       ]
-
-      set WV WV + JV; new WV is WV + JV - shrinkage happens already in the deterime_fluxes procedure
-
-
-
+      set WV (WV + JV)               ; new WV is WV + JV, shrinkage happens in deterime_fluxes
       let dV 0.22
-
-      set L (WV / dV) ^ (1 / 3) ;
-
-      set chla chla - (JA / 48)
-
+      set L ((WV / dV) ^ (1 / 3))
+      set chla (chla - (JA / 48))
     ]
 
-
-     ask clutches-here
-    [
-      if age > 30
-      [
-       ifelse (l > 11 * 0.2)
-        [
-          determine_fluxes fr; fluxes deterimend after Jager et al. 2015
-        ]
-        [
+     ask clutches-here [
+      if age > 30 [
+        ifelse (l > 11 * 0.2) [
+          determine_fluxes fr        ; fluxes deterimend after Jager et al. 2015
+        ][
           determine_fluxes_larvae fr
         ]
-
-        set WV WV + JV; new WV is WV + JV - shrinkage happens already in the deterime_fluxes procedure
-        set WR WR + JR
-
-
+        set WV (WV + JV)             ; new WV is WV + JV, shrinkage happens in deterime_fluxes
+        set WR (WR + JR)
         let dV 0.22
-
-        set L (WV / dV) ^ (1 / 3) ;
-
-        set chla chla - number * (JA / 48)
-
+        set L ((WV / dV) ^ (1 / 3))
+        set chla (chla - number * (JA / 48))
       ]
     ]
 
-    if chla < -0.00001 [user-message "Negative chla values"] ; this is due to numerical issues that zero may be not exactly zero
-    if (chla <= 0.005) [  set chla 0.005] ; It is important to set a minimum amount of chla at the end. This is due to diffusion from ohter patches or deeper layser. chla > 0 is important to model the ressource.
-
+    ; It is important to set a minimum amount of chla at the end. This is due to diffusion from other patches or deeper layers.
+    ; chla > 0 is important to model the ressource.
+    if (chla <= 0.005) [set chla 0.005]
   ]
-
-
 
 end
 
-; chain release is the asexual part of reproduction - here it is length dependent; if salps reach a given length the release a chain of with a given number of bud (aggregates), but not more
-; than it has been observed
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; determine fluxes                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to determine_fluxes [frac]
+  ; fluxes determined following Jager et al. 2015
+
+  let dayt (ticks mod 365) ; get day of year based on ticks
+
+  ; Arrhenius relation from appendix of jager paper
+  ; 8000 is Arrhenius temperature and a value suggested by Lika et al. 2011 J. o. Sea Research 66
+  ; 273 is the reference temperature in Kelvin
+  ; T is the actual temperature in the model
+  let tempdep (exp (8000 / 273 - 8000 / T))
+
+  ; adult krill may have a reduced metabolic activity during winter
+  ifelse (dayt > 90 and dayt < 270 and l > 30 * 0.2) [
+
+    ; assimilation
+    let JaAm HibernationFactor * 0.044   ; maximum area-specific assimilation rate
+    set JA frac * JaAm * L ^ 2 * tempdep ; mass flux for assimilation
+
+    ; respiration
+    let JVM HibernationFactor * 0.0032   ; volume-specific maintenance cost
+    set JM JVM * L ^ 3 * tempdep         ; mass flux for maintenance
+
+    ; growth
+    let YVA 0.8                          ; yield of assimilates on structure, value by Jager et al.
+    let kappa 0.8                        ; fraction of assimilation flux for soma, value by Jager et al.
+    set JV (YVA * (kappa * JA - JM))     ; mass flux for structure
+
+    ; reproduction
+    set JR (1 - kappa) * JA              ; mass flux to reproduction buffer
+
+    if (JV < 0) [
+      let delta JV
+      ifelse (JR > abs (delta)) [
+        set JV 0                          ; mass flux for structure
+        set JR (JR + delta)               ; mass flux to reproduction buffer
+      ][
+        set JV (JV + JR)                  ; mass flux for structure
+        set JR 0                          ; mass flux to reproduction buffer
+        ifelse ( WR > abs (JV)) [
+          set WR (WR + JV)                ; mass of reproduction buffer in adult
+          set JV 0                        ; mass flux for structure
+        ][; respiration cannot be covered by assimilated carbon and reproduction buffer,
+          ; than krill shrink (WV is getting smaller since JV is negative
+          set JV (JV + WR)                ; mass flux for structure
+          set WR 0                        ; mass of reproduction buffer in adult
+          set WV (WV + JV)                ; mass of sturctural body
+          set JV 0                        ; mass flux for structure
+          set starvation-days (starvation-days + 1) ; increase counter for starvation
+        ]
+      ]
+    ]
+  ][; fluxes during summer
+    let JaAm 0.044                        ; maximum area-specific assimilation rate (ma/(l^2*t))
+    set JA frac * JaAm * L ^ 2 * tempdep  ; assimilation flux
+    let JVM 0.0032                        ; volume specific maintenance cost (ma/(l^3*t))
+    set JM JVM * L ^ 3 * tempdep          ; maintenance flux
+    let YVA 0.8                           ; yield of ssimilates on structure, value by Jager et al.
+    let kappa 0.8                         ; fraction of assimilation flux for soma, value by Jager et al.
+    set JV (YVA * (kappa * JA - JM))      ; mass flux for structure
+    set JR ((1 - kappa) * JA)             ; mass flux for reproduction buffer
+    if (JV < 0) [
+      let delta JV
+      ifelse (JR > abs (delta)) [
+        set JV 0                          ; mass flux for structure
+        set JR (JR + delta)               ; mass flux to reproduction buffer
+      ][
+        set JV (JV + JR)                  ; mass flux for structure
+        set JR 0                          ; mass flux for reproduction buffer
+        ifelse (WR > abs (JV)) [
+          set WR (WR + JV)                ; mass of reproduction buffer in adult
+          set JV 0                        ; mass flux for structure
+        ][
+          set JV (JV + WR)                ; mass flux for structure
+          set WR 0                        ; mass of reproduction buffer in adult
+          set WV (WV + JV)                ; mass of structural body
+          set JV 0                        ; mass flux for structure
+          set starvation-days (starvation-days + 1) ; increase starvation counter
+        ]
+      ]
+    ]
+  ]
+
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; determine fluxes larvae             ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to determine_fluxes_larvae [frac]
+  ; frac is the functional response (Holling II)  fluxes determined following Jager et al. 2015
+  ; but how are the fluxes different for small krill (larvae and juvenile) from the one of adult krill
+  ; here following Jager et al. 2015 - there is only the growth part stored.
+  ; the flux into reproduction JR is burned
+
+  let dayt (ticks mod 365)                    ; get day of year from tick number
+  let tempdep (exp (8000 / 273 - 8000 / (T))) ; Arrhenius relation from appendix of jager paper
+
+  let JaAm 0.044                              ; maximum area-specific assimilation rate
+  set JA (frac * JaAm * L ^ 2 * tempdep)      ; mass flux for assimilation
+
+  let JVM 0.0032                              ; volume-specific maintenance cost
+  set JM (JVM * L ^ 3 * tempdep)              ; mass flux for maintenance
+
+  let YVA 0.8                                 ; yield of assimilates on structure (Jager et al. 2015)
+  let kappa 0.8                               ; fraction of assimilation flux for soma (Jager et al. 2015)
+  set JV (YVA * (kappa * JA - JM))            ; mass flux for structure
+  set JR 0                                    ; mass flux to reproduction buffer
+
+  if (JV < 0) [
+    set WV (WV + JV)                          ; mass of structural body
+    set JV 0                                  ; mass flux for storage
+    set starvation-days (starvation-days + 1) ; increase counter for days starving
+  ]
+
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; asexual reproduction                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to asexual_repro
+  ; chain release is the asexual part of reproduction - here it is length dependent
+  ; if salps reach a given length the release a chain with a given number of bud (aggregates), but not more
+  ; than it has been observed
 
   ask oozoids [
-  if (l > 6.5 and grown = true and oozoid-repro-events = 0)
-  [
+    if (l > 6.5 and grown = true and oozoid-repro-events = 0) [
       let budnumber floor (reprobuffer / 0.0329)
       set budnumber min list budnumber 150
 
-
-
-      hatch-chains 1 [
-
-      set generation generation + 1 set number budnumber set l 0.5 set size 2 set age 0 set sex 0 set starvation-days 0 set cw (l * 10 / 17) ^(1 / 0.4) set reprobuffer cw / 4] ;; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+      hatch-chains 1 [ ;; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+        set generation generation + 1
+        set number budnumber
+        set l 0.5
+        set size 2
+        set age 0
+        set sex 0
+        set starvation-days 0
+        set cw (l * 10 / 17) ^(1 / 0.4)
+        set reprobuffer cw / 4
+      ]
       set oozoid-repro-events oozoid-repro-events + 1
       set regenerationtime age
       set reprobuffer reprobuffer - budnumber * 0.0329
-
-
-   ]
-
-  if (l > 8 and grown = true and oozoid-repro-events = 1)
-  [
+    ]
+    if (l > 8 and grown = true and oozoid-repro-events = 1) [
       let budnumber floor (reprobuffer / 0.0329)
       set budnumber min list budnumber 180
-
-      hatch-chains 1 [set generation generation + 1 set number 180  set l 0.5 set size 2 set age 0 set sex 0 set starvation-days 0 set cw (l * 10 / 17) ^(1 / 0.4) set reprobuffer cw / 4] ;; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+      hatch-chains 1 [ ; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+        set generation generation + 1
+        set number budnumber
+        set l 0.5
+        set size 2
+        set age 0
+        set sex 0
+        set starvation-days 0
+        set cw (l * 10 / 17) ^(1 / 0.4)
+        set reprobuffer cw / 4
+      ]
       set oozoid-repro-events oozoid-repro-events + 1
       set reprobuffer reprobuffer - budnumber * 0.0329
-
     ]
 
-    if (l > 9.5 and grown = true and oozoid-repro-events = 2)
-    [
+    if (l > 9.5 and grown = true and oozoid-repro-events = 2) [
       let budnumber floor (reprobuffer / 0.0329)
       set budnumber min list budnumber 210
-
-
-
-      hatch-chains 1 [ set generation generation + 1  set number budnumber set l 0.5 set size 2 set age 0 set sex 0 set starvation-days 0 set cw (l * 10 / 17) ^(1 / 0.4) set reprobuffer cw / 4] ;; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+      hatch-chains 1 [ ; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+        set generation generation + 1
+        set number budnumber
+        set l 0.5
+        set size 2
+        set age 0
+        set sex 0
+        set starvation-days 0
+        set cw (l * 10 / 17) ^(1 / 0.4)
+        set reprobuffer cw / 4
+      ]
       set oozoid-repro-events oozoid-repro-events + 1
       set reprobuffer reprobuffer - budnumber * 0.0329
     ]
 
-    if (l > 10.5 and grown = true and oozoid-repro-events = 3)
-    [
-
-
+    if (l > 10.5 and grown = true and oozoid-repro-events = 3) [
       let budnumber floor (reprobuffer / 0.0329)
       set budnumber min list budnumber 240
-
-      hatch-chains 1 [ set generation generation + 1 set number budnumber set l 0.5 set size 2 set age 0 set sex 0 set starvation-days 0 set cw (l * 10 / 17) ^(1 / 0.4) set reprobuffer cw / 4] ;; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+      hatch-chains 1 [ ; initial size following Pakhomov and Hunt 2017 release size 3 - 5 mm
+        set generation generation + 1
+        set number budnumber
+        set l 0.5
+        set size 2
+        set age 0
+        set sex 0
+        set starvation-days 0
+        set cw (l * 10 / 17) ^(1 / 0.4)
+        set reprobuffer cw / 4
+      ]
       set oozoid-repro-events oozoid-repro-events + 1
       set regenerationtimelist lput (age - regenerationtime) regenerationtimelist
       die
     ]
-
   ]
 
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; sexual reproduction                 ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; sexual part of the salp reproduction. At a given size and sufficient carbon allocated in the reprobuffer a embryo is released with 0.7 survival. After that the blastozoids change sex and the chain dies,
-; since the male blastozoids do not form chains
 to sexual-repro
+  ; sexual part of the salp reproduction. At a given size and sufficient carbon allocated in the reprobuffer a embryo is released with 0.7 survival. After that the blastozoids change sex and the chain dies,
+  ; since the male blastozoids do not form chains
 
-  ask chains [
+  ask chains [ ; embryo release is following Pakhomov and Hunt 2017, Deep- Sea Research II
     if (l > 2.5 and reprobuffer > 0.0269) [
       repeat number [
-        ifelse (random-float 1 < 0.7)
-        [  hatch-oozoids 1 [ set number 1 set generation generation + 1  set l 0.4 set size 2  set age 0 set color (color + (random-float 1 - 0.5) ) set starvation-days 0 set oozoid-repro-events 0 set cw (l * 10 / 17) ^(1 / 0.4) set reprobuffer cw / 4]  hatch-blastozoids 1 [set sex 1 set number 1 ] ]
-        [ hatch-blastozoids 1 [set sex 1 set number 1] ]
+        ifelse (random-float 1 < 0.7) [
+          hatch-oozoids 1 [
+            set number 1
+            set generation generation + 1
+            set l 0.4
+            set size 2
+            set age 0
+            set color (color + (random-float 1 - 0.5))
+            set starvation-days 0
+            set oozoid-repro-events 0
+            set cw (l * 10 / 17) ^(1 / 0.4)
+            set reprobuffer cw / 4
+          ]
+          hatch-blastozoids 1 [
+            set sex 1
+            set number 1
+          ]
+        ][
+          hatch-blastozoids 1 [
+            set sex 1
+            set number 1
+          ]
+        ]
       ]
       die; here the chain dies and only individuals survive
-    ] ;; embryio release is following Pakhomov and Hunt 2017, Deep- Sea Research II
+    ]
   ]
 
-  ; for krill we follow the ideas of Jager et al. 2015 - clutch size is abitrary and also the buffer that remains with the krill 35 is open for further manipulation
-  ask debkrill
-  [
-
-   set WR WR + JR
-
-    if (WR > 56 + 35)       ; the number 56 is following Jager et al. 2015 value for WB0 (dry weight of an egg) and a clutch size of 2000, i.e. 2000 * 0.038 mgdwt = 56 - the number 35 is an ad hoc buffer to buffer starvation
-    [
-      if spawningevent = 0 [set ageoffirstrepro age]
-
+  ; for krill we follow the ideas of Jager et al. 2015 - clutch size is abitrary and
+  ; also the buffer that remains with the krill 35 is open for further manipulation
+  ask debkrill [
+    set WR WR + JR
+    ; the number 56 is following Jager et al. 2015 value for WB0 (dry weight of an egg) and a clutch size of 2000,
+    ; i.e. 2000 * 0.038 mgdwt = 56 - the number 35 is an ad hoc buffer to buffer starvation
+    if (WR > 56 + 35) [
+      if spawningevent = 0 [
+        set ageoffirstrepro age
+      ]
       set spawningevent spawningevent + 1
-
       set WR WR - 56
-
-      hatch-clutches 1
-      [
-
-        set l (1.72 * 0.2) ; this is already the length of C1 stage, but we assume that the first 30 days krill will not feed, the growth will be fed by the energy from the eggs
-        set WV 0.22 * ( L) ^ 3 ; structural body mass
-        set WB 0.0; Assimilate buffer in egg - this is from Jager et al. 2015
-        set WR 0 ; Build-up of reproduction buffer
+      hatch-clutches 1 [
+        set l (1.72 * 0.2)            ; this is already the length of C1 stage, but we assume that the first 30 days krill will not feed, the growth will be fed by the energy from the eggs
+        set WV 0.22 * ( L) ^ 3        ; structural body mass
+        set WB 0.0                    ; assimilate buffer in egg
+        set WR 0                      ; reproduction buffer
         set JA 0
         set JV 0
         set JR 0
         set JM 0
-        set spawningevent 0; number of spawning events
-        set age 0; age in days
-        set ageoffirstrepro 0; age of first reproduction
-        setxy random-xcor random-ycor; random location
-        set number 2000 set age 0
+        set spawningevent 0           ; number of spawning events
+        set age 0                     ; age in days
+        set ageoffirstrepro 0         ; age of first reproduction
+        setxy random-xcor random-ycor ; random location
+        set number 2000
+        set age 0
         set starvation-days 0
-
-
       ]
-
     ]
-
-
   ]
 
 end
 
-; salps die after 500 days or due to daily mortality or due to starvation (30 days)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; aging and dying                     ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to death
+  ; salps die after 500 days or due to daily mortality or due to starvation (30 days)
 
-ask oozoids [ set age age + 1 if (age > 500 or oozoid-repro-events = 5) [die]];
-ask blastozoids [ set age age + 1 if (age > 500) [die]]
-ask chains [ set age age + 1 if (age > 500) [die]]
-ask (turtle-set oozoids blastozoids chains) [if (starvation-days > starvation) [ die]]
+  ask oozoids [
+    set age age + 1
+    if (age > 500 or oozoid-repro-events = 5) [die]
+  ]
+  ask blastozoids [
+    set age age + 1
+    if (age > 500) [die]
+  ]
+  ask chains [
+    set age age + 1
+    if (age > 500) [die]
+  ]
+  ask (turtle-set oozoids blastozoids chains) [
+    if (starvation-days > starvation) [die]
+  ]
 
-ask oozoids [ if random-float 1 < DailyMort [die]]
+  ask oozoids [
+    if random-float 1 < DailyMort [die]
+  ]
 
-ask blastozoids [ if random-float 1 < DailyMort [die]]
+  ask blastozoids [
+    if random-float 1 < DailyMort [die]
+  ]
 
-ask chains [
+  ask chains [
     let counter 0
     repeat number [
       if random-float 1 < DailyMort [
-        set counter counter + 1 ]
+        set counter counter + 1
       ]
+    ]
     set number number - counter
     if number <= 0 [die]
   ]
 
-  ask debkrill [ set age age + 1
+  ask debkrill [
+    set age age + 1
     if (age > (8 * 365)) or (random-float 1 < (1 - debsurvival) )[die]
   ]
 
   ; To reduce computational effort in the beginning clutches are computed as cohorts. If the number drops below 10 they are treated as individuals
-
-  ask clutches
-  [
+  ask clutches [
     set age age + 1
-
     set number number * 0.95
-
-    if number < 10
-    [
-
-      hatch-debkrill (round number)
-      [
+    if number < 10 [
+      hatch-debkrill (round number) [
         set WV 0.22 * L ^ 3 ; structural body mass
         ;set WB 0.028; Assimilate buffer in egg;
         ;set WR 0 ; Build-up of reproduction buffer
@@ -746,393 +833,83 @@ ask chains [
         ;set age 0
         set ageoffirstrepro 0
         ;setxy random-xcor random-ycor
-
       ]
       die
-     ]
-
+    ]
   ]
-end
-
-; only random walk for salps and krill, but certainly krill may move further and even avoid salps?
-to move
-
-  ask turtles [ move-to one-of neighbors]
 
 end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; immigration of salps                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to immigration
+  ; there is no wintersurvival in the model for salps. Thus they migrate into the simulation arena at some point in the season.
+  if (count (turtle-set oozoids chains blastozoids) < 1) [
+    if( random-float 1 < immiprob) [
+      create-oozoids ni [
+        set number 1
+        set l sizeofmigra
+        set size 2
+        set color (47 + random-float 2 - 1)
+        setxy random-xcor random-ycor
+        set oozoid-repro-events 0
+        set generation 0
+        set starvation-days 0
+        set cw (l * 10 / 17) ^(1 / 0.4)
+        set reprobuffer cw / 4
+      ]
+      set immigrationtime ticks
+      set migrationevent? true
+    ]
+  ]
+
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; update patches                      ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to update-patches
 
-  if (PPMode = "Lognorm")
-  [
-    if (ticks mod 365 = 180 - vegetation_delay)
-    [
+  if (PPMode = "Lognorm") [
+    if (ticks mod 365 = 180 - vegetation_delay) [
       let nstar (read-from-string file-read-line) / 100
       set chlaK nstar / ( 1 - deltachla / rchla)
-
     ]
   ]
 
   let algae_growth rchla * (0.5 * cos ((ticks + vegetation_delay) / 365 * 360) + 0.5)
 
-  ask patches
-  [
-
+  ask patches [
     set chla max list (chla + resolution * (algae_growth * (chla / resolution) * ( 1 - (chla / resolution) / chlaK) - deltachla * (chla / resolution))) (0.005 * resolution)
-    set pcolor scale-color  green chla 10 0
-    if (chla < 0) [user-message "Warning! Chla < 0 in update patches" ]
+    set pcolor scale-color green chla 10 0
+    if (chla < 0) [user-message "Warning! Chla < 0 in update patches"]
   ]
 
-  ;; the survival for krill should be density dependent, assuming one large adult krill has a body dry weight of 220 the following decline in survival would result in a survival of 0 at 100,000 krill
-
+  ; the survival for krill should be density dependent, assuming one large adult krill has a body dry weight of 220 the following decline in survival would result in a survival of 0 at 100,000 krill
   let WVtemp sum [WV] of debkrill
-
   let tempsurvival ( 1 - WVtemp / 22000000)
   if tempsurvival < 0 [set tempsurvival 0]
 
-
-   set debsurvival tempsurvival
-
-  ;print debsurvival
+  set debsurvival tempsurvival
 
 end
 
-; there is no wintersurvival in the model for salps. Thus they migrate into the simulatin arena at some point in the season. This is modelled here
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; movement                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to immigration
-
-
-if (count (turtle-set oozoids chains blastozoids) < 1) [
-
-    if( random-float 1 < immiprob)
-    [
-
-      create-oozoids ni [set number 1 set l sizeofmigra set size 2  (set color 47 + random-float 2 - 1) setxy random-xcor random-ycor set oozoid-repro-events 0 set generation 0 set starvation-days 0 set cw (l * 10 / 17) ^(1 / 0.4) set reprobuffer cw / 4]
-
-      set immigrationtime ticks
-      set migrationevent? true
-
-    ]
-  ]
+to move
+  ; only random walk for salps and krill, but certainly krill may move further and even avoid salps?
+  ask turtles [move-to one-of neighbors]
 
 end
 
-
-to plot-histo
-
-set-current-plot "Histogram Oozoids lengths (cm)"
-
-set-plot-pen-mode 1
-
-set-plot-x-range 0 15
-
-set-histogram-num-bars 50
-
-histogram [l] of oozoids
-
-
-set-current-plot "Histogram Blastozoids lengths (cm)"
-
-set-plot-pen-mode 1
-
-set-plot-x-range 0 5
-
-set-histogram-num-bars 50
-
-histogram [l] of (turtle-set blastozoids chains)
-
-
-
-set-current-plot "Age of Oozoids"
-
-set-plot-pen-mode 1
-
-set-plot-x-range 0 500
-
-set-histogram-num-bars 50
-
-histogram [age] of oozoids
-
-
-
-set-current-plot "Age of Blastozoids"
-
-set-plot-pen-mode 1
-
-set-plot-x-range 0 500
-
-set-histogram-num-bars 50
-
-histogram [age] of (turtle-set blastozoids chains)
-
-if (ticks mod 365 = 50) ; to reduce computational effort this is only computed once a year
-  [
-
-    if MeasureInc?
-    [
-
-      set-current-plot "Growth Rates Oozoids"
-
-      clear-plot
-
-      set-plot-pen-mode 1
-
-      set-plot-x-range 0 (max (gr-o) + 0.5)
-
-      set-histogram-num-bars 50
-
-      histogram gr-o
-
-
-
-      set-current-plot "Growth Rates Blastozoids"
-
-      set-plot-pen-mode 1
-
-      let upper-value 1
-
-      if (length gr-b > 0)
-      [
-        set upper-value max(gr-b)
-      ]
-
-      set-plot-x-range 0 (upper-value + 0.5)
-
-      set-histogram-num-bars 50
-
-      histogram gr-b
-
-    ]
-    set-current-plot "Annual distribution"
-
-    clear-plot
-
-    set-plot-pen-mode 1
-
-    set-histogram-num-bars 12
-
-    set-plot-x-range 0 13
-
-    let summ sum monthlycount
-
-    let monthlycount_temp monthlycount
-
-    (foreach [0 1 2 3 4 5 6 7 8 9 10 11 ] monthlycount_temp[[a b] -> set monthlycount_temp (replace-item a monthlycount_temp ( ((item a monthlycount_temp / summ)  ))  )])
-    (foreach [0 1 2 3 4 5 6 7 8 9 10 11 ] monthlycount_temp  [[a b] -> set monthlycount_temp (replace-item a monthlycount_temp ( precision (item a monthlycount_temp) 3   ))] )
-
-    set-plot-y-range 0 (max (monthlycount_temp) + 0.1  )
-
-    (foreach [1 2 3 4 5 6 7 8 9 10 11 12] monthlycount_temp[[a b] -> plotxy a b])
-
-  ]
-
-  set-current-plot "Chain releases"
-
-  set-plot-pen-mode 1
-
-  set-plot-x-range 0 6
-
-  set-histogram-num-bars 6
-
-  histogram [oozoid-repro-events] of oozoids
-
-
-  set-current-plot "Bud/Oozoid"
-
-  set-plot-pen-mode 0
-
-
-  let temp n_blasto
-  let temp2 n_oozoids
-
-  if (temp2 > 0)
-  [ plotxy ticks temp / temp2
-  set ratio-list lput (temp / temp2) ratio-list
-  ]
-
-
-  set-current-plot "Krill Growth Curves"
-
-  foreach [who] of debkrill [ x -> plotxy (ticks ) ([l / 0.2] of sdebkrill x)]
-
-
-end
-
-
-to determine_fluxes [frac]; fluxes determined following Jager et al. 2015
-  ; important in winter adult krill is descreasing its metabolic activity! This is expressed by the case differentiation below.
-
-
-
-let dayt ticks mod 365
-let tempdep exp ( 8000 / 273 - 8000 / ( T)) ; Arrhenius relation from appendix of jager paper
-
-ifelse (dayt > 90 and dayt < 270 and l > 30 * 0.2); adult krill may have a reduced metabolic activity during winter
-  [
-    ; assimilation
-    let JaAm HibernationFactor * 0.044
-    set JA frac * JaAM * L ^ 2 * tempdep; seems o.k.
-
-    ; respiration
-    let JVM HibernationFactor * 0.0032
-    set JM JVM * L ^ 3 * tempdep ; seems o.k.
-
-    ; growth
-    let YVA 0.8
-    let kappa 0.8
-    set JV (YVA * (kappa * JA - JM))
-    ; reproduction
-    set JR (1 - kappa) * JA
-
-
-    ;; if JM > JA
-
-    if (JV < 0)
-    [
-
-      let delta JV
-
-      ifelse (JR > abs (delta))
-      [
-
-        set JV 0
-        set JR JR + delta
-
-
-
-      ]
-      [
-
-
-        set JV JV + JR
-        set JR 0
-
-
-        ifelse ( WR > abs (JV))
-        [
-
-
-          set WR WR + JV
-          set JV 0
-
-        ]
-        [; respiration cannot be covered by assimilated carbon and reproduction buffer, than krill shrink (WV is getting smaller since JV is negative
-
-
-
-          set JV JV + WR
-          set WR 0
-
-
-          set WV WV + JV
-          set JV 0
-          set starvation-days starvation-days + 1
-
-        ]
-
-      ]
-
-    ]
-  ]
-
-  [
-
-    let JaAm 0.044
-    set JA frac * JaAM * L ^ 2 * tempdep; seems o.k.
-
-
-    let JVM 0.0032
-    set JM JVM * L ^ 3 * tempdep ; seems o.k.
-
-    let YVA 0.8
-    let kappa 0.8
-    set JV (YVA * (kappa * JA - JM))
-
-    set JR (1 - kappa) * JA
-
-
-
-    ;; if JM > JA
-
-    if (JV < 0)
-    [
-
-      let delta JV
-      ifelse (JR > abs (delta))
-      [
-        set JV 0
-        set JR JR + delta
-      ]
-      [
-        set JV JV + JR
-        set JR 0
-
-        ifelse ( WR > abs (JV))
-        [
-          set WR WR + JV
-          set JV 0
-        ]
-        [
-          set JV JV + WR
-          set WR 0
-          set WV WV + JV
-          set JV 0
-
-          set starvation-days starvation-days + 1
-
-        ]
-
-      ]
-
-    ]
-  ]
-end
-
-to determine_fluxes_larvae [frac]; frac is the functional response (Holling II)  fluxes determined following Jager et al. 2015
-  ; but how are the fluxes different for small krill (larvae and juvenile) from the one of adult krill
-  ; here following Jager et al. 2015 - there is only the growth part stored. The flux into reproduction JR is burned
-
-
-
-  let dayt ticks mod 365
-  let tempdep exp ( 8000 / 273 - 8000 / ( T)) ; Arrhenius relation from appendix of jager paper
-
-
-
-  let JaAm 0.044
-  set JA frac * JaAM * L ^ 2 * tempdep; seems o.k.
-
-
-  let JVM 0.0032
-  set JM JVM * L ^ 3 * tempdep ; seems o.k.
-
-  let YVA 0.8
-  let kappa 0.8
-  set JV (YVA * (kappa * JA - JM))
-  set JR 0
-
-  ;; if JM > JA
-
-  if (JV < 0)
-  [
-    set WV WV + JV
-    set JV 0
-    set starvation-days starvation-days + 1
-  ]
-
-end
-
-to detreprocyclesalp; how many reproductive cycles have happened in the seaon
-
-    set rc max_gen
-    if (rc > rc_max) [set rc_max rc]
-    set max_gen 0
-    ask (turtle-set blastozoids oozoids chains) [set generation 0]
-
-    set-current-plot "Seasonal repoduction cycles"
-    plot rc / 2
-
-end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; update all plots                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to do_graphs
 
@@ -1141,38 +918,29 @@ to do_graphs
   set n_oozoids count oozoids
   set n_blasto (count blastozoids + sum [number] of chains); counting all blastozoids, males and females
 
-
-  plot-histo
+  plot-histo ; update histograms
 
   set maxn (max (list maxn (n_oozoids + n_blasto))); maximum salp abundance during the simulation run
 
-  if n_oozoids > 0; storing the largest body length of oozoids
-  [
+  if n_oozoids > 0 [ ; storing the largest body length of oozoids
     set maxlo (max list maxlo max [l] of oozoids)
   ]
 
-  if n_blasto > 0; storing the largest body length of blastozoids, males and females (chains)
-  [
+  if n_blasto > 0 [ ; storing the largest body length of blastozoids, males and females (chains)
     set maxlb (max list maxlb max [l] of (turtle-set blastozoids chains))
   ]
 
-  if (n_oozoids + n_blasto > peakabundance) ; storing the highes abundance during the season
-  [
+  if (n_oozoids + n_blasto > peakabundance) [ ; storing the highes abundance during the season
     set peakabundance (n_oozoids + n_blasto)
     set peakimmigrationtime immigrationtime
   ]
 
-  if (ticks mod 365 = 210); end of july, at the end of the Southern winter when abundances should be really low
-  [
-
+  if (ticks mod 365 = 210) [ ; end of july, at the end of the Southern winter when abundances should be really low
     set peakabundancelist lput peakabundance peakabundancelist; in peakabundancelist the highest salp abundance is stored that occured in the season (here the season ends after 210 days, i.e. end of July)
-
-    ifelse migrationevent? = true; only if in that season migration has happened it make sense to store the time
-    [
+    ifelse migrationevent? = true [ ; only if in that season migration has happened it make sense to store the time
       set immigrationtimelist lput peakimmigrationtime immigrationtimelist
       set migrationevent? false
-    ]
-    [; -1 indicates that no migration event has happened in that particular season
+    ][ ; -1 indicates that no migration event has happened in that particular season
       set immigrationtimelist lput -1 immigrationtimelist
     ]
 
@@ -1181,37 +949,102 @@ to do_graphs
     set peakabundance 0; resetting peakabundance
   ]
 
-  if (count debkrill > 0) ; maxspawn is the highest number of spawning events that one krill had in its life time
-  [
+  if (count debkrill > 0) [ ; maxspawn is the highest number of spawning events that one krill had in its life time
     set maxspawn max (list maxspawn (max [spawningevent] of debkrill))
   ]
+
 end
 
-to ref; idea of this function is to set all parameters back to their reference values
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; update histograms                   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  set starvation 30
-  set dailymort 0.02
-  set grazing_factor 0.003
-  set vegetation_delay 45
-  set immiprob 0.0085
-  set rchla 0.25
-  set deltachla 0.05
-  set halfsat 0.2
-  set HibernationFactor 0.2
-  set ni 10
-  set const_food 1
-  set sizeofmigra 3
-  set N_krill 10
-  set oozoid_resp 0.05
-  set blasto_resp 0.15
+to plot-histo
+
+  set-current-plot "Histogram Oozoids lengths (cm)"
+  set-plot-pen-mode 1
+  set-plot-x-range 0 15
+  set-histogram-num-bars 50
+  histogram [l] of oozoids
+
+  set-current-plot "Histogram Blastozoids lengths (cm)"
+  set-plot-pen-mode 1
+  set-plot-x-range 0 5
+  set-histogram-num-bars 50
+  histogram [l] of (turtle-set blastozoids chains)
+
+  set-current-plot "Age of Oozoids"
+  set-plot-pen-mode 1
+  set-plot-x-range 0 500
+  set-histogram-num-bars 50
+  histogram [age] of oozoids
+
+  set-current-plot "Age of Blastozoids"
+  set-plot-pen-mode 1
+  set-plot-x-range 0 500
+  set-histogram-num-bars 50
+  histogram [age] of (turtle-set blastozoids chains)
+
+  ; to reduce computational effort this is only computed once a year
+  if (ticks mod 365 = 50) [
+    if MeasureInc? [
+
+      set-current-plot "Growth Rates Oozoids"
+      clear-plot
+      set-plot-pen-mode 1
+      set-plot-x-range 0 (max (gr-o) + 0.5)
+      set-histogram-num-bars 50
+      histogram gr-o
+
+      set-current-plot "Growth Rates Blastozoids"
+      set-plot-pen-mode 1
+      let upper-value 1
+      if (length gr-b > 0) [
+        set upper-value max(gr-b)
+      ]
+      set-plot-x-range 0 (upper-value + 0.5)
+      set-histogram-num-bars 50
+      histogram gr-b
+    ]
+
+    set-current-plot "Annual distribution"
+    clear-plot
+    set-plot-pen-mode 1
+    set-histogram-num-bars 12
+    set-plot-x-range 0 13
+    let summ sum monthlycount
+    let monthlycount_temp monthlycount
+    (foreach [0 1 2 3 4 5 6 7 8 9 10 11 ] monthlycount_temp[[a b] -> set monthlycount_temp (replace-item a monthlycount_temp ( ((item a monthlycount_temp / summ)  ))  )])
+    (foreach [0 1 2 3 4 5 6 7 8 9 10 11 ] monthlycount_temp  [[a b] -> set monthlycount_temp (replace-item a monthlycount_temp ( precision (item a monthlycount_temp) 3   ))] )
+    set-plot-y-range 0 (max (monthlycount_temp) + 0.1  )
+    (foreach [1 2 3 4 5 6 7 8 9 10 11 12] monthlycount_temp[[a b] -> plotxy a b])
+  ]
+
+  set-current-plot "Chain releases"
+  set-plot-pen-mode 1
+  set-plot-x-range 0 6
+  set-histogram-num-bars 6
+  histogram [oozoid-repro-events] of oozoids
+
+  set-current-plot "Bud/Oozoid"
+  set-plot-pen-mode 0
+  let temp n_blasto
+  let temp2 n_oozoids
+  if (temp2 > 0) [
+    plotxy ticks temp / temp2
+    set ratio-list lput (temp / temp2) ratio-list
+  ]
+
+  set-current-plot "Krill Growth Curves"
+  foreach [who] of debkrill [ x -> plotxy (ticks ) ([l / 0.2] of sdebkrill x)]
 
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-108
-14
-520
-427
+120
+15
+532
+428
 -1
 -1
 4.0
@@ -1235,10 +1068,10 @@ ticks
 30.0
 
 BUTTON
-12
-30
-75
-63
+15
+20
+95
+53
 NIL
 setup
 NIL
@@ -1246,16 +1079,16 @@ NIL
 T
 OBSERVER
 NIL
-NIL
+S
 NIL
 NIL
 1
 
 BUTTON
-12
-87
-75
-120
+15
+60
+95
+93
 NIL
 go
 T
@@ -1263,7 +1096,7 @@ T
 T
 OBSERVER
 NIL
-NIL
+W
 NIL
 NIL
 1
@@ -1515,18 +1348,18 @@ NIL
 HORIZONTAL
 
 BUTTON
-13
-136
-76
-169
-NIL
-Ref
+15
+100
+95
+133
+ref-values
+set starvation 30\nset dailymort 0.02\nset grazing_factor 0.003\nset vegetation_delay 45\nset immiprob 0.0085\nset rchla 0.25\nset deltachla 0.05\nset halfsat 0.2\nset HibernationFactor 0.2\nset ni 10\nset const_food 1\nset sizeofmigra 3\nset N_krill 10\nset oozoid_resp 0.05\nset blasto_resp 0.15
 NIL
 1
 T
 OBSERVER
 NIL
-NIL
+A
 NIL
 NIL
 1
@@ -1586,10 +1419,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 MONITOR
-6
-327
-87
-372
+10
+325
+95
+370
 Max Density
 precision (maxn /  (101 * 101 * 16)) 2
 17
@@ -1615,10 +1448,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot temp_factor"
 
 CHOOSER
-2
-184
-94
-229
+11
+182
+111
+227
 PPMode
 PPMode
 "Const" "Lognorm"
@@ -1658,10 +1491,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-1
-237
-104
-270
+10
+235
+113
+268
 Chains?
 Chains?
 0
@@ -1796,17 +1629,17 @@ N_krill
 N_krill
 0
 2000
-1.0
+10.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-0
-282
-103
-315
+9
+280
+112
+313
 salps?
 salps?
 0
@@ -1929,6 +1762,17 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot count debkrill"
+
+MONITOR
+9
+378
+99
+423
+NIL
+max_gen
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
