@@ -255,10 +255,10 @@ to grow
 
   ; in the grow procedure the change in body length will be calculated for all animals, this is done for each patch checking whether there is enough food available or not
 
-   set T (cos ((ticks) / 365 * 360) * 2 + 273)         ; set temperature based on time of year
-   set temp_factor (exp (8000 / (2 + 273) - 8000 / T)) ; Arrhenius temperature factor - matches well with the reported q10 of 2.8
-   let tempdep (exp (8000 / 273 - 8000 / T))           ; Arrhenius relation for krill, that can be potentially different than for salps
-   let dayt ticks mod 365                              ; day of the year - used for krill below
+  set T (cos ((ticks) / 365 * 360) * 2 + 273)         ; set temperature based on time of year
+  set temp_factor (exp (8000 / 275 - 8000 / T))       ; Arrhenius relation for salps taken from Groenefeld et al. (2020)
+  let tempdep (exp (7421 / 274.15 - 7421 / T))        ; Arrhenius relation for krill taken from Bahlburg et al. (2021)
+  let dayt ticks mod 365                              ; day of the year - used for krill below
 
 
   ; the following procedures are conducted per patch - assuming this is the local area where individuals compete for ressources ------------------
@@ -499,11 +499,7 @@ to determine_fluxes [frac]
 
   let dayt (ticks mod 365) ; get day of year based on ticks
 
-  ; Arrhenius relation from appendix of jager paper
-  ; 8000 is Arrhenius temperature and a value suggested by Lika et al. 2011 J. o. Sea Research 66
-  ; 273 is the reference temperature in Kelvin
-  ; T is the actual temperature in the model
-  let tempdep (exp (8000 / 273 - 8000 / T))
+  let tempdep (exp (7421 / 274.15 - 7421 / T)) ; Arrhenius relation from Bahlburg et al. (2021)
 
   ; adult krill may have a reduced metabolic activity during winter
   ifelse (dayt > 90 and dayt < 270 and l > 30 * 0.2) [
@@ -588,24 +584,24 @@ to determine_fluxes_larvae [frac]
   ; here following Jager et al. 2015 - there is only the growth part stored.
   ; the flux into reproduction JR is burned
 
-  let dayt (ticks mod 365)                    ; get day of year from tick number
-  let tempdep (exp (8000 / 273 - 8000 / (T))) ; Arrhenius relation from appendix of jager paper
+  let dayt (ticks mod 365)                       ; get day of year from tick number
+  let tempdep (exp (7421 / 274.15 - 7421 / (T))) ; Arrhenius relation for Krill from Bahlburg et al. (2021)
 
-  let JaAm 0.044                              ; maximum area-specific assimilation rate
-  set JA (frac * JaAm * L ^ 2 * tempdep)      ; mass flux for assimilation
+  let JaAm 0.044                                 ; maximum area-specific assimilation rate
+  set JA (frac * JaAm * L ^ 2 * tempdep)         ; mass flux for assimilation
 
-  let JVM 0.0032                              ; volume-specific maintenance cost
-  set JM (JVM * L ^ 3 * tempdep)              ; mass flux for maintenance
+  let JVM 0.0032                                 ; volume-specific maintenance cost
+  set JM (JVM * L ^ 3 * tempdep)                 ; mass flux for maintenance
 
-  let YVA 0.8                                 ; yield of assimilates on structure (Jager et al. 2015)
-  let kappa 0.8                               ; fraction of assimilation flux for soma (Jager et al. 2015)
-  set JV (YVA * (kappa * JA - JM))            ; mass flux for structure
-  set JR 0                                    ; mass flux to reproduction buffer
+  let YVA 0.8                                    ; yield of assimilates on structure (Jager et al. 2015)
+  let kappa 0.8                                  ; fraction of assimilation flux for soma (Jager et al. 2015)
+  set JV (YVA * (kappa * JA - JM))               ; mass flux for structure
+  set JR 0                                       ; mass flux to reproduction buffer
 
   if (JV < 0) [
-    set WV (WV + JV)                          ; mass of structural body
-    set JV 0                                  ; mass flux for storage
-    set starvation-days (starvation-days + 1) ; increase counter for days starving
+    set WV (WV + JV)                             ; mass of structural body
+    set JV 0                                     ; mass flux for storage
+    set starvation-days (starvation-days + 1)    ; increase counter for days starving
   ]
 
 end
@@ -872,8 +868,7 @@ to update-patches
 
   ask patches [
     set chla (max list (chla + resolution * (algae_growth * (chla / resolution) * (1 - (chla / resolution) / chlaK) - deltachla * (chla / resolution))) (0.005 * resolution))
-    set pcolor (scale-color green chla 10 0)
-    if (chla < 0) [user-message "Warning! Chla < 0 in update patches"]
+    set pcolor (scale-color green chla 15 0)
   ]
 
   ; the survival for krill should be density dependent, assuming one large adult krill has a body dry weight of 220
@@ -895,6 +890,19 @@ end
 to move
   ; only random walk for salps and krill, but certainly krill may move further and even avoid salps?
   ask turtles [move-to one-of neighbors]
+
+  ; Individual swimming speeds have been measured at between 15 and 30 cm/s (Kils 1981; Murphy et al. 2011).
+
+  ; [...] In particular, the direction of swarm movement deviated from the background flow most when fluorescence levels were high,
+  ; which is likely to be a response to retaining a favourable feeding environment (Tarling & Fielding 2016).
+
+  ; Tarling and Thorpe (2014):
+  ; [...] In the natural environment, both individuals and swarms have to contend with one of the world's strongest ocean currents, the
+  ; Antarctic Circumpolar Current, with average flow rates of between 10 and 20 cm/s.
+  ; [...] The overall cost of transport was estimated to be around 73% of total daily metabolic expenditure, at least during early summer. This
+  ; compares to an estimate of 60% of total daily metabolic expenditure by Kils (1981), which he calculated through measuring the cost of hovering and assuming
+  ; that forward propulsion at speeds of up to 25 cm s?1 could be attained at no extra cost through changing body angle.
+  ; [...] At the individual level, Antarctic krill has been reported to alter activity levels according to time of year.
 
 end
 
@@ -1625,7 +1633,7 @@ SWITCH
 313
 salps?
 salps?
-0
+1
 1
 -1000
 
