@@ -1,5 +1,5 @@
 ;; This model is on the interaction of salps and krill. Salps can occurr in three life stages Oozoids, blastozoids and chains and Krill can occurr as adult krill or larval krill
-;; larval inclduing juvenile krill < 30 mm will stay active all year round while adult krill will hibernate. The larval stage is not actively represented and only relevant in the growing process
+;; larval inclduing juvenile krill < 35 mm will stay active all year round while adult krill will hibernate. The larval stage is not actively represented and only relevant in the growing process
 ;; To model larvae cohorts are modelled called clutches to avoid computational problems
 
 
@@ -293,13 +293,13 @@ to grow
     let JAtemp 0
 
     ask debkrill-here [
-      ifelse (dayt > 90 and dayt < 270 and l > 30 * 0.2) [ ; this is unique to krill, if individuals are adults here l > 30 mm, than they can reduce metabolic activity during winter
+      ifelse (dayt > 90 and dayt < 270 and l > 35 * 0.2) [ ; this is unique to krill, if individuals are adults here l > 35 mm, than they can reduce metabolic activity during winter
         ; HibernationFactor (!slider!, 0.2 standard value) changes the food uptake
-        let JaAm (HibernationFactor * 0.044)               ; JaAm: maximum area-specific assimilation rate (ma/(l^2*t))
+        let JaAm (HibernationFactor * 0.044)               ; JaAm: maximum area-specific assimilation rate (Jager & Ravagnan 2015)
         set JAtemp (fr * JaAm * L ^ 2 * tempdep)           ; potential food uptake
         set need (need + JAtemp / 48)                      ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
       ][
-        let JaAm 0.044                                     ; JaAm: maximum area-specific assimilation rate (ma/(l^2*t))
+        let JaAm 0.044                                     ; JaAm: maximum area-specific assimilation rate (Jager & Ravagnan 2015)
         set JAtemp (fr * JaAm * L ^ 2 * tempdep)           ; potential food uptake
         set need (need + JAtemp / 48)                      ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
       ]
@@ -307,7 +307,7 @@ to grow
 
     ask clutches-here [
       if (age > 30) [
-        let JaAm 0.044                                    ; JaAm: maximum area-specific assimilation rate (ma/(l^2*t))
+        let JaAm 0.044                                    ; JaAm: maximum area-specific assimilation rate (Jager & Ravagnan 2015)
         set JAtemp (fr * JaAm * L ^ 2 * tempdep * number) ; here uptake is multiplied by the number of small krill in the cohort
         set need (need + JAtemp / 48)                     ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
       ]
@@ -325,7 +325,7 @@ to grow
       let oldl l
       let starvationlocal false
       set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2))  ; reduction of the overall available chla in the patch
-      let growth_resp (temp_factor * oozoid_resp * cw)                        ; respiration costs
+      let growth_resp (temp_factor * oozoid_resp * cw)                        ; respiration costs based on carbon weight and correction (no source)
       ifelse (growth_resp > carbon_growth) [                                  ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                 ; if respiration can be covered by assimilated carbon
           set carbon_repro (carbon_repro + carbon_growth - growth_resp)
@@ -378,7 +378,7 @@ to grow
       let oldl l
       let starvationlocal false
       set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2)) ; reduction of the overall available chla in the patch
-      let growth_resp (temp_factor * blasto_resp * cw)                       ; respiration costs
+      let growth_resp (temp_factor * blasto_resp * cw)                       ; respiration costs based on carbon weight and correction (no source)
       ifelse (growth_resp > carbon_growth) [                                 ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                ; if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
           set carbon_repro (carbon_repro + carbon_growth - growth_resp)
@@ -458,13 +458,13 @@ to grow
 
     ; growth of adult krill
     ask debkrill-here [
-      ifelse (l > 11 * 0.2) [
-        determine_fluxes fr          ; fluxes deterimend after Jager et al. 2015
+      ifelse (l > 11 * 0.2) [        ; check if krill is juvenile or adult (Jager & Ravagnan 2015)
+        determine_fluxes fr          ; fluxes deterimend after Jager & Ravagnan (2015)
       ][
         determine_fluxes_larvae fr
       ]
       set WV (WV + JV)               ; new WV is WV + JV, shrinkage happens in deterime_fluxes
-      let dV 0.22
+      let dV 0.22                    ; dry weight density (Jager & Ravagnan 2015)
       set L ((WV / dV) ^ (1 / 3))
       set chla (chla - (JA / 48))
     ]
@@ -472,14 +472,14 @@ to grow
     ; growth of larvae krill
     ask clutches-here [
       if age > 30 [
-        ifelse (l > 11 * 0.2) [
-          determine_fluxes fr        ; fluxes deterimend after Jager et al. 2015
+        ifelse (l > 11 * 0.2) [      ; check if kirll is juvenile or adult (Jager & Ravagnan 2015)
+          determine_fluxes fr        ; fluxes deterimend after Jager & Ravagnan (2015)
         ][
           determine_fluxes_larvae fr
         ]
         set WV (WV + JV)             ; new WV is WV + JV, shrinkage happens in deterime_fluxes
         set WR (WR + JR)
-        let dV 0.22
+        let dV 0.22                  ; dry weight density (Jager & Ravagnan 2015)
         set L ((WV / dV) ^ (1 / 3))
         set chla (chla - number * (JA / 48))
       ]
@@ -497,26 +497,27 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to determine_fluxes [frac]
-  ; fluxes determined following Jager et al. 2015
+  ; fluxes determined following Jager & Ravagnan (2015)
 
   let dayt (ticks mod 365) ; get day of year based on ticks
 
   let tempdep (exp (7421 / 274.15 - 7421 / T)) ; Arrhenius relation from Bahlburg et al. (2021)
 
   ; adult krill may have a reduced metabolic activity during winter
-  ifelse (dayt > 90 and dayt < 270 and l > 30 * 0.2) [
+  ; length for adults from Jager & Ravagnan (2015)
+  ifelse (dayt > 90 and dayt < 270 and l > 35 * 0.2) [
 
     ; assimilation
-    let JaAm HibernationFactor * 0.044   ; maximum area-specific assimilation rate
+    let JaAm HibernationFactor * 0.044   ; maximum area-specific assimilation rate (Jager & Ravagnan 2015)
     set JA frac * JaAm * L ^ 2 * tempdep ; mass flux for assimilation
 
     ; respiration
-    let JVM HibernationFactor * 0.0032   ; volume-specific maintenance cost
+    let JVM HibernationFactor * 0.0032   ; volume-specific maintenance cost (Jager & Ravagnan 2015)
     set JM JVM * L ^ 3 * tempdep         ; mass flux for maintenance
 
     ; growth
-    let YVA 0.8                          ; yield of assimilates on structure, value by Jager et al.
-    let kappa 0.8                        ; fraction of assimilation flux for soma, value by Jager et al.
+    let YVA 0.8                          ; yield of assimilates on structure (Jager & Ravagnan 2015)
+    let kappa 0.8                        ; fraction of assimilation flux for soma (Jager & Ravagnan 2015)
     set JV (YVA * (kappa * JA - JM))     ; mass flux for structure
 
     ; reproduction
@@ -534,7 +535,7 @@ to determine_fluxes [frac]
           set WR (WR + JV)                          ; mass of reproduction buffer in adult
           set JV 0                                  ; mass flux for structure
         ][; respiration cannot be covered by assimilated carbon and reproduction buffer,
-          ; than krill shrink (WV is getting smaller since JV is negative
+          ; than krill shrink (WV is getting smaller since JV is negative)
           set JV (JV + WR)                          ; mass flux for structure
           set WR 0                                  ; mass of reproduction buffer in adult
           set WV (WV + JV)                          ; mass of sturctural body
@@ -544,12 +545,12 @@ to determine_fluxes [frac]
       ]
     ]
   ][; fluxes during summer
-    let JaAm 0.044                          ; maximum area-specific assimilation rate (ma/(l^2*t))
+    let JaAm 0.044                          ; maximum area-specific assimilation rate (Jager & Ravagnan (2015)
     set JA (frac * JaAm * L ^ 2 * tempdep)  ; assimilation flux
-    let JVM 0.0032                          ; volume specific maintenance cost (ma/(l^3*t))
+    let JVM 0.0032                          ; volume specific maintenance cost (Jager & Ravagnan 2015)
     set JM (JVM * L ^ 3 * tempdep)          ; maintenance flux
-    let YVA 0.8                             ; yield of assimilates on structure, value by Jager et al.
-    let kappa 0.8                           ; fraction of assimilation flux for soma, value by Jager et al.
+    let YVA 0.8                             ; yield of assimilates on structure (Jager & Ravagnan 2015)
+    let kappa 0.8                           ; fraction of assimilation flux for soma (Jager & Ravagnan 2015)
     set JV (YVA * (kappa * JA - JM))        ; mass flux for structure
     set JR ((1 - kappa) * JA)               ; mass flux for reproduction buffer
     if (JV < 0) [
@@ -589,10 +590,10 @@ to determine_fluxes_larvae [frac]
   let dayt (ticks mod 365)                       ; get day of year from tick number
   let tempdep (exp (7421 / 274.15 - 7421 / (T))) ; Arrhenius relation for Krill from Bahlburg et al. (2021)
 
-  let JaAm 0.044                                 ; maximum area-specific assimilation rate
+  let JaAm 0.044                                 ; maximum area-specific assimilation rate (Jager & Ravagnan 2015)
   set JA (frac * JaAm * L ^ 2 * tempdep)         ; mass flux for assimilation
 
-  let JVM 0.0032                                 ; volume-specific maintenance cost
+  let JVM 0.0032                                 ; volume-specific maintenance cost (Jager & Ravagnan 2015)
   set JM (JVM * L ^ 3 * tempdep)                 ; mass flux for maintenance
 
   let YVA 0.8                                    ; yield of assimilates on structure (Jager et al. 2015)
@@ -806,7 +807,9 @@ to death
   ; krill dies after 8 years or due to daily mortality
   ask debkrill [
     set age (age + 1)
-    if (age > (6 * 365)) or (random-float 1 < (1 - debsurvival))[die]
+    ;if (age > (6 * 365)) or (random-float 1 < (1 - debsurvival))[die]
+    if (age > (6 * 365)) or (random-float 1 < 0.0015)[die]
+    ; daily mortality calculated from data of Ikeda & Dixon (1982) as well as Auerswald et al. (2015)
   ]
 
   ; To reduce computational effort in the beginning clutches are computed as cohorts.
@@ -1648,7 +1651,7 @@ HibernationFactor
 HibernationFactor
 0
 1
-0.2
+0.211
 0.001
 1
 NIL
