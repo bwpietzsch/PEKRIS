@@ -35,7 +35,6 @@ globals [
   peakimmigrationtime       ; this variable store the maximum immigration time during a season
   migrationevent?           ; true if a migration event happened during this season
   T                         ; daily temperature (Kelvin)
-  debsurvival               ; biomass dependent krill survival
   maxspawn                  ; maximum spawn events of single krill
 ]
 
@@ -186,7 +185,6 @@ to setup
     set starvation-days 0         ; no starvation so far
   ]
 
-  set debsurvival 1               ; set biomass dependent krill survival to 1
   set maxspawn 0                  ; maximum spawn events of single krill
 
   reset-ticks                     ; update all plots and start the NetLogo clock
@@ -325,7 +323,7 @@ to grow
       let oldl l
       let starvationlocal false
       set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2))  ; reduction of the overall available chla in the patch
-      let growth_resp (temp_factor * oozoid_resp * cw)                        ; respiration costs based on carbon weight and correction (no source)
+      let growth_resp (temp_factor * oozoid_resp / 100 * cw)                        ; respiration costs based on carbon weight (Iguchi 2004)
       ifelse (growth_resp > carbon_growth) [                                  ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                 ; if respiration can be covered by assimilated carbon
           set carbon_repro (carbon_repro + carbon_growth - growth_resp)
@@ -378,7 +376,7 @@ to grow
       let oldl l
       let starvationlocal false
       set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2)) ; reduction of the overall available chla in the patch
-      let growth_resp (temp_factor * blasto_resp * cw)                       ; respiration costs based on carbon weight and correction (no source)
+      let growth_resp (temp_factor * blasto_resp / 100 * cw)                 ; respiration costs based on carbon weight (Iguchi 2004)
       ifelse (growth_resp > carbon_growth) [                                 ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                ; if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
           set carbon_repro (carbon_repro + carbon_growth - growth_resp)
@@ -795,13 +793,15 @@ to death
     if (age > 500) [die]
     if (starvation-days > starvation) [die]
     let counter 0
-    repeat number [
-      if (random-float 1 < DailyMort) [
-        set counter (counter + 1)
+    if (number > 0) [
+      repeat number [
+        if (random-float 1 < DailyMort) [
+          set counter (counter + 1)
+        ]
       ]
     ]
     set number (number - counter)
-    if number <= 0 [die]
+    if (number <= 0) [die]
   ]
 
   ; krill dies after 8 years or due to daily mortality
@@ -875,16 +875,6 @@ to update-patches
     set chla (max list (chla + resolution * (algae_growth * (chla / resolution) * (1 - (chla / resolution) / chlaK) - deltachla * (chla / resolution))) (0.005 * resolution))
     set pcolor (scale-color green chla 15 0)
   ]
-
-  ; the survival for krill should be density dependent, assuming one large adult krill has a body dry weight of 220
-  ; the following decline in survival would result in a survival of 0 at 100,000 krill
-  let WVtemp (sum [WV] of debkrill)
-  let tempsurvival (1 - WVtemp / 22000000)
-  if tempsurvival < 0 [
-    set tempsurvival 0
-  ]
-
-  set debsurvival tempsurvival
 
 end
 
@@ -1048,10 +1038,10 @@ to plot-histo
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-120
-15
-532
-428
+350
+10
+762
+423
 -1
 -1
 4.0
@@ -1109,10 +1099,10 @@ NIL
 1
 
 PLOT
-535
-15
-765
-300
+775
+10
+1005
+295
 Abundances
 NIL
 NIL
@@ -1128,10 +1118,10 @@ PENS
 "Solitaries" 1.0 0 -2674135 true "" "plotxy (ticks)  n_oozoids"
 
 PLOT
-770
-15
-930
-300
+1010
+10
+1170
+295
 Mean Chla (scaled from 1 to 0)
 NIL
 NIL
@@ -1220,7 +1210,7 @@ PENS
 
 PLOT
 1257
-535
+465
 1546
 740
 Growth Rates Oozoids
@@ -1237,10 +1227,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-1258
-848
-1552
-1052
+1250
+760
+1544
+964
 Growth Rates Blastozoids
 NIL
 NIL
@@ -1255,32 +1245,32 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 MONITOR
-1259
-482
-1432
-527
+1540
+300
+1615
+345
 NIL
 mean gr-o
-17
+5
 1
 11
 
 MONITOR
-1268
-767
-1480
-812
+1620
+300
+1700
+345
 NIL
 mean gr-b
-17
+5
 1
 11
 
 SLIDER
-9
-485
-181
-518
+15
+285
+187
+318
 starvation
 starvation
 0
@@ -1310,10 +1300,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 SLIDER
-10
-530
-182
-563
+16
+330
+188
+363
 DailyMort
 DailyMort
 0
@@ -1325,10 +1315,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-10
-575
-182
-608
+16
+375
+188
+408
 grazing_factor
 grazing_factor
 0
@@ -1340,10 +1330,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-10
-620
-180
-653
+16
+420
+186
+453
 vegetation_delay
 vegetation_delay
 0
@@ -1360,7 +1350,7 @@ BUTTON
 95
 133
 ref-values
-set starvation 30\nset dailymort 0.025\nset grazing_factor 0.0025\nset vegetation_delay 45\nset immiprob 0.0085\nset rchla 0.25\nset deltachla 0.05\nset halfsat 0.2\nset HibernationFactor 0.2\nset ni 10\nset const_food 1\nset sizeofmigra 3\nset N_krill 10\nset oozoid_resp 0.05\nset blasto_resp 0.15
+set starvation 30\nset dailymort 0.025\nset grazing_factor 0.0025\nset vegetation_delay 45\nset immiprob 0.0085\nset rchla 0.25\nset deltachla 0.05\nset halfsat 0.2\nset HibernationFactor 0.2\nset ni 10\nset const_food 1\nset sizeofmigra 3\nset N_krill 20\nset oozoid_resp 3.5\nset blasto_resp 3.0
 NIL
 1
 T
@@ -1400,7 +1390,7 @@ NIL
 0.0
 10.0
 0.0
-10.0
+3.0
 true
 false
 "" ""
@@ -1408,10 +1398,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-912
-306
-1083
-458
+1152
+301
+1323
+453
 Bud/Oozoid
 NIL
 NIL
@@ -1426,10 +1416,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 MONITOR
-10
-325
-95
-370
+1620
+350
+1700
+395
 Max Density
 precision (maxn /  (101 * 101 * 16)) 2
 17
@@ -1437,10 +1427,10 @@ precision (maxn /  (101 * 101 * 16)) 2
 11
 
 PLOT
-545
-307
-705
-457
+785
+302
+945
+452
 Temp_Factor
 NIL
 NIL
@@ -1455,20 +1445,20 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot temp_factor"
 
 CHOOSER
-11
-182
-111
-227
+15
+140
+115
+185
 PPMode
 PPMode
 "Const" "Lognorm"
 0
 
 PLOT
-711
-307
-911
-457
+951
+302
+1151
+452
 Salp peaks
 NIL
 NIL
@@ -1483,10 +1473,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 SLIDER
-10
-665
-182
-698
+16
+465
+188
+498
 immiprob
 immiprob
 0
@@ -1498,10 +1488,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-10
-705
-182
-738
+16
+505
+188
+538
 rchla
 rchla
 0
@@ -1513,10 +1503,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-10
-750
-182
-783
+16
+550
+188
+583
 deltachla
 deltachla
 0
@@ -1528,21 +1518,21 @@ NIL
 HORIZONTAL
 
 SWITCH
-10
-439
-136
-472
+16
+239
+142
+272
 MeasureInc?
 MeasureInc?
-0
+1
 1
 -1000
 
 SLIDER
-10
-795
-182
-828
+16
+595
+188
+628
 halfsat
 halfsat
 0
@@ -1554,10 +1544,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-10
-885
-182
-918
+16
+685
+188
+718
 ni
 ni
 0
@@ -1565,14 +1555,14 @@ ni
 10.0
 1
 1
-NIL
+n
 HORIZONTAL
 
 SLIDER
-10
-970
-182
-1003
+16
+770
+188
+803
 sizeofmigra
 sizeofmigra
 0
@@ -1584,10 +1574,10 @@ NIL
 HORIZONTAL
 
 PLOT
-935
-15
-1134
-296
+1175
+10
+1374
+291
 Krill Growth Curves
 NIL
 NIL
@@ -1602,10 +1592,10 @@ PENS
 "default" 1.0 2 -16777216 true "" ""
 
 SLIDER
-10
-930
-182
-963
+16
+730
+188
+763
 const_food
 const_food
 0
@@ -1617,25 +1607,25 @@ NIL
 HORIZONTAL
 
 SLIDER
-10
-1010
-182
-1043
+15
+810
+187
+843
 N_krill
 N_krill
 0
 2000
-10.0
+20.0
 1
 1
-NIL
+n
 HORIZONTAL
 
 SWITCH
-10
-235
-113
-268
+14
+193
+117
+226
 salps?
 salps?
 0
@@ -1643,25 +1633,25 @@ salps?
 -1000
 
 SLIDER
-10
-840
-182
-873
+16
+640
+188
+673
 HibernationFactor
 HibernationFactor
 0
 1
-0.211
+0.2
 0.001
 1
 NIL
 HORIZONTAL
 
 PLOT
-1140
-15
-1310
-295
+1380
+10
+1550
+290
 Krill abundance
 NIL
 NIL
@@ -1676,28 +1666,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count debkrill + sum [number] of clutches"
 
 PLOT
-1087
-308
-1287
-458
-Debsurvival
-NIL
-NIL
-0.0
-10.0
-0.0
-1.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot debsurvival"
-
-PLOT
-1290
-308
-1490
-458
+1330
+300
+1530
+450
 Maximum krill life time spawn events 
 NIL
 NIL
@@ -1712,40 +1684,40 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot maxspawn"
 
 SLIDER
-350
-980
-522
-1013
+15
+850
+187
+883
 oozoid_resp
 oozoid_resp
 0
+100
+3.5
+0.1
 1
-0.05
-0.001
-1
-NIL
+%
 HORIZONTAL
 
 SLIDER
-350
-1025
-522
-1058
+15
+895
+187
+928
 blasto_resp
 blasto_resp
 0
+100
+3.0
+0.1
 1
-0.15
-0.001
-1
-NIL
+%
 HORIZONTAL
 
 PLOT
-1315
-15
-1490
-295
+1555
+10
+1730
+290
 Abundance adult krill
 NIL
 NIL
@@ -1760,10 +1732,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count debkrill"
 
 MONITOR
-9
-378
-99
-423
+1540
+400
+1615
+445
 NIL
 max_gen
 17
@@ -1771,10 +1743,10 @@ max_gen
 11
 
 MONITOR
-10
-275
-67
-320
+1620
+400
+1695
+445
 C°
 (cos ((ticks) / 365 * 360) * 2 + 273) - 273
 2
@@ -1782,145 +1754,165 @@ C°
 11
 
 TEXTBOX
-190
-490
-340
-508
+196
+290
+346
+308
 for salps from Groene
 12
 0.0
 1
 
 TEXTBOX
-190
-540
+196
 340
-558
-for all from Groene
-12
-0.0
-1
-
-TEXTBOX
-190
-585
-340
-603
-for all from Groene
-12
-0.0
-1
-
-TEXTBOX
-190
-630
-340
-648
-for all from Groene
-12
-0.0
-1
-
-TEXTBOX
-190
-675
-340
-693
-for salps from Groene
-12
-0.0
-1
-
-TEXTBOX
-185
-705
-335
-735
-Chla production from Groene
-12
-0.0
-1
-
-TEXTBOX
-185
-750
-335
-785
-Chla decay from Groene
-12
-0.0
-1
-
-TEXTBOX
-185
-800
-335
-818
-for all from Groene
-12
-0.0
-1
-
-TEXTBOX
-185
-850
-335
-868
-for Krill from ?
-12
-0.0
-1
-
-TEXTBOX
-185
-895
-335
-913
-for salps from Groene
-12
-0.0
-1
-
-TEXTBOX
-185
-930
-335
-960
-max Chla if const food from Groene
-12
-0.0
-1
-
-TEXTBOX
-185
-975
-335
-993
+346
+358
 for Salps from Groene
 12
 0.0
 1
 
 TEXTBOX
-185
-1020
-335
-1038
-for Krill from ?
+196
+385
+346
+403
+for all from Groene
+12
+0.0
+1
+
+TEXTBOX
+196
+430
+346
+448
+for all from Groene
+12
+0.0
+1
+
+TEXTBOX
+196
+475
+346
+493
+for salps from Groene
+12
+0.0
+1
+
+TEXTBOX
+191
+505
+341
+535
+Chla production from Groene
+12
+0.0
+1
+
+TEXTBOX
+191
+550
+341
+585
+Chla decay from Groene
+12
+0.0
+1
+
+TEXTBOX
+191
+600
+341
+618
+for all from Groene
+12
+0.0
+1
+
+TEXTBOX
+190
+640
+340
+675
+for Krill,  < 30 % (Atkins et al. 2002)
+12
+0.0
+1
+
+TEXTBOX
+191
+695
+341
+713
+for salps from Groene
+12
+0.0
+1
+
+TEXTBOX
+191
+730
+341
+760
+max Chla if const food from Groene
+12
+0.0
+1
+
+TEXTBOX
+191
+775
+341
+793
+for Salps from Groene
+12
+0.0
+1
+
+TEXTBOX
+190
+810
+340
+840
+initial Krill populations size
 12
 0.0
 1
 
 MONITOR
-150
-435
-220
-480
+1540
+350
+1615
+395
 # krill
 (count debkrill) + (round (sum [number] of clutches))
-17
+0
 1
 11
+
+TEXTBOX
+195
+850
+345
+885
+C loss for respiration (Iguchi 2004): 2.5-4.9
+12
+0.0
+1
+
+TEXTBOX
+195
+895
+345
+925
+C loss for respiration (Iguchi 2004): 0.8-6.1
+12
+0.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
