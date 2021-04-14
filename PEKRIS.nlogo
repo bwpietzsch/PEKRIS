@@ -16,22 +16,22 @@ globals [
   gr-b                      ; list where growth rates of blastozoids are stored
   maxn                      ; maximum number of salps
   monthlycount              ; list that stores the intra-annual distribution of salp abundances
-  rc                        ; generation time counter
-  rc_max                    ; maximum number of reproductive cycles in a season
+  rc                        ; number of regeneration cycles each season
+  rc_max                    ; maximum number of regeneration cycles in a season
   ratio-list                ; list where ratio of oozoids and blastozoids are stored
   maxlo                     ; maximum length of oozoids
   maxlb                     ; maximum length of blastozoids
   temp_factor               ; based on the temperature physiological processes are reduced
-  chlaK
-  peakabundance             ; this variable stores the maximum abundance during a season
-  peakabundancelist         ; this list stores the abundance peak in each season
-  max_gen                   ; this variable stores the number of reproductive cycles of salps in one season
+  chlaK                     ; maximum chla density in the season
+  peakabundance             ; maximum abundance of salps in the season
+  peakabundancelist         ; list of peak abundances
+  max_gen                   ; max number of reproductive cycles of salps in one season
   n_oozoids                 ; number of oozoids in the world
   n_blasto                  ; number of blastozoids in the world
-  resolution                ; this defines how much m^3 are represented by one patch - important for the amount of food one animal can access per day
-  immigrationtime           ; this variable stores the time when salps occur in the season
-  immigrationtimelist       ; this list stores the time when salps enter the arena
-  regenerationtimelist      ; this list stores the time between the first chain release and the last chain release of oozoids
+  resolution                ; how many cubic meters are represented by a netlogo patch
+  immigrationtime           ; time during the year when a small cohort of oozoids entered the simulation arena
+  immigrationtimelist       ; list of the immigration times during the simulation
+  regenerationtimelist      ; this measures the time between first chain release and last
   peakimmigrationtime       ; this variable store the maximum immigration time during a season
   migrationevent?           ; true if a migration event happened during this season
   T                         ; daily temperature (Kelvin)
@@ -117,6 +117,7 @@ to setup
   set peakabundancelist []                   ; this list stores the abundance peak in each season
   set immigrationtimelist []                 ; this list stores the time when salps enter the arena
   set regenerationtimelist []                ; this list stores the time between the first chain release and the last chain release of oozoids
+  set migrationevent? false
 
   set monthlycount [0 0 0 0 0 0 0 0 0 0 0 0] ; here the intraannual distribution of salp abundances will be stored
 
@@ -138,17 +139,17 @@ to setup
       stop                                   ; if file is at the end the simulation stops
     ][
       set nstar ((read-from-string file-read-line) / 100) ; a new value is read in
-      set chlaK (nstar / ( 1 - deltachla / rchla)) ; deltachla: decay rate of chla per day, rchla: growth rate of chla
+      set chlaK (nstar / ( 1 - chla_decay / chla_growth)) ; renormalization using the logistic equation term with loss term
     ]
   ][
   ; const max chla each year - the maximum would be than const_food each each
-    set chlaK (const_food / ( 1 - deltachla / rchla)) ; deltachla: decay rate of chla per day, rchla: growth rate of chla
+    set chlaK (const_food / ( 1 - chla_decay / chla_growth))
     set nstar const_food
   ]
 
   ask patches [
     set chla (nstar * resolution)            ; calculates amount of chla for each patch
-    set pcolor (scale-color green chla 0 1)  ; set color depending on chla content
+    set pcolor (59 - chla / 4)
   ]
 
   ; creation of oozoids ----------------------------------------------------------------------------------------------------------------------------- ;
@@ -159,7 +160,7 @@ to setup
       set number 1                        ; 1 individual
       set l 2                             ; body length l = 2 cm
       set size 2                          ; size as depicted in NetLogo
-      set color (47 + random-float 2 - 1) ; randomly vary color
+      set color 45                        ; salps are displayed as yellow
       set oozoid-repro-events 0           ; no chains released so far
       set generation 0                    ; no generation this season so far
       set cw ((l * 10 / 17) ^(1 / 0.4))   ; carbon weight cw is calculated according to an equation provided by Henschke et al 2018
@@ -173,7 +174,7 @@ to setup
 
   ; creation of krill ------------------------------------------------------------------------------------------------------------------------------- ;
 
-  create-debkrill N_krill [       ; create N_krill
+  create-debkrill Krill_amount [  ; create N_krill
     set L 0.34                    ; structural length of 1.7 mm - C1 stage with 30 days of age (Ikeda 1984 J. Exp. Mar. Biol. Ecol.)
     set WV 0.22 * ( L) ^ 3        ; structural body mass
     set WB 0.0                    ; no assimilate buffer in egg so far
@@ -183,6 +184,7 @@ to setup
     set ageoffirstrepro 0         ; no reproduction so far
     setxy random-xcor random-ycor ; random location
     set starvation-days 0         ; no starvation so far
+    set color black               ; krill are displayed as black
   ]
 
   set maxspawn 0                  ; maximum spawn events of single krill
@@ -292,8 +294,7 @@ to grow
 
     ask debkrill-here [
       ifelse (dayt > 90 and dayt < 270 and l > 35 * 0.2) [ ; this is unique to krill, if individuals are adults here l > 35 mm, than they can reduce metabolic activity during winter
-        ; HibernationFactor (!slider!, 0.2 standard value) changes the food uptake
-        let JaAm (HibernationFactor * 0.044)               ; JaAm: maximum area-specific assimilation rate (Jager & Ravagnan 2015)
+        let JaAm (Krill_hibernation / 100 * 0.044)               ; JaAm: maximum area-specific assimilation rate (Jager & Ravagnan 2015)
         set JAtemp (fr * JaAm * L ^ 2 * tempdep)           ; potential food uptake
         set need (need + JAtemp / 48)                      ; converting JA into food requires to divide by Yax = 0.8 and to convert mg C into mg chla c:chla = 60 and therefore 48 = 0.8 * 60
       ][
@@ -347,7 +348,7 @@ to grow
       let oldcw cw                                                     ; this is for testing
       set cw (cw + carbon_growth)                                      ; new growth
       if (cw - oldcw < 0 ) [user-message "cw shrinkage"]               ; salps are not allowed to shrink
-      set reprobuffer ((1 - oozoid_resp) * reprobuffer + carbon_repro) ; reprobuffer is updated - here are respiration costs for the reproductive tissue calculated - this is not done in the DEB
+      set reprobuffer ((1 - oozoid_resp / 100) * reprobuffer + carbon_repro) ; reprobuffer is updated - here are respiration costs for the reproductive tissue calculated - this is not done in the DEB
       set l ((17 * cw ^ 0.4) / 10)                                     ; conversion from carbon weight to body length - from an empirical relationship cited in Henschke et al. 2018
       if (l - oldl < -0.00001) [
         user-message word "l smaller than old l" (l - oldl)
@@ -398,7 +399,7 @@ to grow
         if (carbon_growth < 0) [user-message "carbon-growth"]
       ]
       set cw (cw + carbon_growth)
-      set reprobuffer ((1 - blasto_resp) * reprobuffer + carbon_repro)
+      set reprobuffer ((1 - blasto_resp / 100) * reprobuffer + carbon_repro)
       set l ((17 * cw ^ 0.4) / 10)
       ifelse (starvationlocal = true) [
         set starvation-days (starvation-days + 1)
@@ -419,7 +420,7 @@ to grow
       let oldl l
       let starvationlocal false
       set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2))
-      let growth_resp (temp_factor * blasto_resp * cw)
+      let growth_resp (temp_factor * blasto_resp / 100 * cw)
       ifelse (growth_resp > carbon_growth) [                                   ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                  ; if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
           set carbon_repro (carbon_repro + carbon_growth - growth_resp)
@@ -441,7 +442,7 @@ to grow
         if (carbon_growth < 0) [user-message "carbon-growth"]
       ]
       set cw (cw + carbon_growth)
-      set reprobuffer ((1 - blasto_resp) * reprobuffer + carbon_repro)
+      set reprobuffer ((1 - blasto_resp / 100) * reprobuffer + carbon_repro)
       set l ((17 * cw ^ 0.4) / 10)
       ifelse (starvationlocal = true) [
         set starvation-days (starvation-days + 1)
@@ -506,11 +507,11 @@ to determine_fluxes [frac]
   ifelse (dayt > 90 and dayt < 270 and l > 35 * 0.2) [
 
     ; assimilation
-    let JaAm HibernationFactor * 0.044   ; maximum area-specific assimilation rate (Jager & Ravagnan 2015)
+    let JaAm (Krill_hibernation / 100 * 0.044); maximum area-specific assimilation rate (Jager & Ravagnan 2015)
     set JA frac * JaAm * L ^ 2 * tempdep ; mass flux for assimilation
 
     ; respiration
-    let JVM HibernationFactor * 0.0032   ; volume-specific maintenance cost (Jager & Ravagnan 2015)
+    let JVM (Krill_hibernation / 100 * 0.0032); volume-specific maintenance cost (Jager & Ravagnan 2015)
     set JM JVM * L ^ 3 * tempdep         ; mass flux for maintenance
 
     ; growth
@@ -713,7 +714,7 @@ to sexual-repro
             set l 0.4
             set size 2
             set age 0
-            set color (color + (random-float 1 - 0.5))
+            set color 45
             set starvation-days 0
             set oozoid-repro-events 0
             set cw ((l * 10 / 17) ^(1 / 0.4))
@@ -777,25 +778,25 @@ to death
   ask oozoids [
     set age (age + 1)
     if (age > 500 or oozoid-repro-events = 5) [die]
-    if (starvation-days > starvation) [die]
-    if (random-float 1 < DailyMort) [die]
+    if (starvation-days > Salp_starvation) [die]
+    if (random-float 1 < (Salp_mortality / 100)) [die]
   ]
 
   ask blastozoids [
     set age (age + 1)
     if (age > 500) [die]
-    if (starvation-days > starvation) [die]
-    if (random-float 1 < DailyMort) [die]
+    if (starvation-days > Salp_starvation) [die]
+    if (random-float 1 < (Salp_mortality / 100)) [die]
   ]
 
   ask chains [
     set age (age + 1)
     if (age > 500) [die]
-    if (starvation-days > starvation) [die]
+    if (starvation-days > Salp_starvation) [die]
     let counter 0
     if (number > 0) [
       repeat number [
-        if (random-float 1 < DailyMort) [
+        if (random-float 1 < (Salp_mortality / 100)) [
           set counter (counter + 1)
         ]
       ]
@@ -807,8 +808,7 @@ to death
   ; krill dies after 8 years or due to daily mortality
   ask debkrill [
     set age (age + 1)
-    ;if (age > (6 * 365)) or (random-float 1 < (1 - debsurvival))[die]
-    if (age > (6 * 365)) or (random-float 1 < 0.0015)[die]
+    if (age > (6 * 365)) or (random-float 1 < (Krill_mortality / 100))[die]
     ; daily mortality calculated from data of Ikeda & Dixon (1982) as well as Auerswald et al. (2015)
   ]
 
@@ -836,12 +836,12 @@ end
 to immigration
   ; there is no wintersurvival in the model for salps. Thus they migrate into the simulation area at some point in the season.
   if (count (turtle-set oozoids chains blastozoids) < 1) [
-    if (random-float 1 < immiprob) [
-      create-oozoids ni [
+    if (random-float 1 < (Salp_immiprob / 100)) [
+      create-oozoids Salp_amount [
         set number 1
-        set l sizeofmigra
+        set l Salp_length
         set size 2
-        set color (47 + random-float 2 - 1)
+        set color 45
         setxy random-xcor random-ycor
         set oozoid-repro-events 0
         set generation 0
@@ -865,15 +865,15 @@ to update-patches
   if (PPMode = "Lognorm") [
     if (ticks mod 365 = 180 - vegetation_delay) [
       let nstar (read-from-string file-read-line) / 100
-      set chlaK (nstar / ( 1 - deltachla / rchla))
+      set chlaK (nstar / ( 1 - chla_decay / chla_growth))
     ]
   ]
 
-  let algae_growth (rchla * (0.5 * cos ((ticks + vegetation_delay) / 365 * 360) + 0.5))
+  let algae_growth (chla_growth * (0.5 * cos ((ticks + vegetation_delay) / 365 * 360) + 0.5))
 
   ask patches [
-    set chla (max list (chla + resolution * (algae_growth * (chla / resolution) * (1 - (chla / resolution) / chlaK) - deltachla * (chla / resolution))) (0.005 * resolution))
-    set pcolor (scale-color green chla 15 0)
+    set chla (max list (chla + resolution * (algae_growth * (chla / resolution) * (1 - (chla / resolution) / chlaK) - chla_decay * (chla / resolution))) (0.005 * resolution))
+    set pcolor (59 - chla / 4)
   ]
 
 end
@@ -1082,10 +1082,10 @@ NIL
 1
 
 BUTTON
-15
-60
-95
-93
+105
+20
+185
+53
 NIL
 go
 T
@@ -1137,9 +1137,9 @@ PENS
 "pen-1" 1.0 0 -13840069 true "" "plot max [chla] of patches / resolution"
 
 PLOT
-340
+520
 465
-605
+785
 745
 Histogram Oozoids lengths (cm)
 NIL
@@ -1155,9 +1155,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-610
+790
 465
-861
+1041
 745
 Histogram Blastozoids lengths (cm)
 NIL
@@ -1173,9 +1173,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-763
+943
 906
-960
+1140
 1044
 Age of Oozoids
 NIL
@@ -1191,9 +1191,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-764
+944
 754
-953
+1133
 900
 Age of Blastozoids
 NIL
@@ -1209,9 +1209,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-1257
+1437
 465
-1546
+1726
 740
 Growth Rates Oozoids
 NIL
@@ -1227,9 +1227,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-1250
+1430
 760
-1544
+1724
 964
 Growth Rates Blastozoids
 NIL
@@ -1268,11 +1268,11 @@ mean gr-b
 
 SLIDER
 15
-285
-187
-318
-starvation
-starvation
+630
+185
+663
+Salp_starvation
+Salp_starvation
 0
 1000
 30.0
@@ -1282,9 +1282,9 @@ d
 HORIZONTAL
 
 PLOT
-339
+519
 755
-754
+934
 970
 Annual distribution
 NIL
@@ -1301,24 +1301,24 @@ PENS
 
 SLIDER
 16
-330
-188
-363
-DailyMort
-DailyMort
+675
+186
+708
+Salp_mortality
+Salp_mortality
 0
+100
+2.5
+0.1
 1
-0.025
-0.001
-1
-NIL
+% / d
 HORIZONTAL
 
 SLIDER
-16
-375
-188
-408
+15
+445
+187
+478
 grazing_factor
 grazing_factor
 0
@@ -1330,10 +1330,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-16
-420
-186
-453
+15
+405
+185
+438
 vegetation_delay
 vegetation_delay
 0
@@ -1345,12 +1345,12 @@ d
 HORIZONTAL
 
 BUTTON
-15
-100
-95
-133
+195
+20
+275
+53
 ref-values
-set starvation 30\nset dailymort 0.025\nset grazing_factor 0.0025\nset vegetation_delay 45\nset immiprob 0.0085\nset rchla 0.25\nset deltachla 0.05\nset halfsat 0.2\nset HibernationFactor 0.2\nset ni 10\nset const_food 1\nset sizeofmigra 3\nset N_krill 20\nset oozoid_resp 3.5\nset blasto_resp 3.0
+set chla_growth 0.25\nset chla_decay 0.05\nset halfsat 0.20\nset const_food 1\nset vegetation_delay 45\nset grazing_factor 0.0025\nset Salp_immiprob 0.85\nset Salp_amount 10\nset Salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset Salp_starvation 30\nset Salp_mortality 2.5\nset Krill_hibernation 20\nset Krill_amount 20\nset Krill_mortality 0.15
 NIL
 1
 T
@@ -1362,9 +1362,9 @@ NIL
 1
 
 PLOT
-976
+1156
 756
-1242
+1422
 1056
 Chain releases
 NIL
@@ -1380,9 +1380,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-865
+1045
 465
-1250
+1430
 745
 Seasonal repoduction cycles
 NIL
@@ -1446,9 +1446,9 @@ PENS
 
 CHOOSER
 15
-140
+70
 115
-185
+115
 PPMode
 PPMode
 "Const" "Lognorm"
@@ -1473,27 +1473,27 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 SLIDER
-16
-465
-188
-498
-immiprob
-immiprob
+15
+510
+185
+543
+Salp_immiprob
+Salp_immiprob
 0
+100
+0.85
+0.01
 1
-0.0085
-0.001
-1
-NIL
+%
 HORIZONTAL
 
 SLIDER
-16
-505
-188
-538
-rchla
-rchla
+15
+230
+187
+263
+chla_growth
+chla_growth
 0
 1
 0.25
@@ -1503,12 +1503,12 @@ NIL
 HORIZONTAL
 
 SLIDER
-16
-550
-188
-583
-deltachla
-deltachla
+15
+275
+187
+308
+chla_decay
+chla_decay
 0
 1
 0.05
@@ -1519,9 +1519,9 @@ HORIZONTAL
 
 SWITCH
 16
-239
+169
 142
-272
+202
 MeasureInc?
 MeasureInc?
 1
@@ -1529,10 +1529,10 @@ MeasureInc?
 -1000
 
 SLIDER
-16
-595
-188
-628
+15
+320
+190
+353
 halfsat
 halfsat
 0
@@ -1540,16 +1540,16 @@ halfsat
 0.2
 0.01
 1
-NIL
+mg Chla / m³
 HORIZONTAL
 
 SLIDER
-16
-685
-188
-718
-ni
-ni
+15
+550
+187
+583
+Salp_amount
+Salp_amount
 0
 100
 10.0
@@ -1559,18 +1559,18 @@ n
 HORIZONTAL
 
 SLIDER
-16
-770
-188
-803
-sizeofmigra
-sizeofmigra
+15
+590
+187
+623
+Salp_length
+Salp_length
 0
 5
 3.0
 0.1
 1
-NIL
+cm
 HORIZONTAL
 
 PLOT
@@ -1592,10 +1592,10 @@ PENS
 "default" 1.0 2 -16777216 true "" ""
 
 SLIDER
-16
-730
-188
-763
+15
+360
+187
+393
 const_food
 const_food
 0
@@ -1608,11 +1608,11 @@ HORIZONTAL
 
 SLIDER
 15
-810
-187
-843
-N_krill
-N_krill
+820
+185
+853
+Krill_amount
+Krill_amount
 0
 2000
 20.0
@@ -1623,9 +1623,9 @@ HORIZONTAL
 
 SWITCH
 14
-193
+123
 117
-226
+156
 salps?
 salps?
 0
@@ -1633,18 +1633,18 @@ salps?
 -1000
 
 SLIDER
-16
-640
-188
-673
-HibernationFactor
-HibernationFactor
+15
+900
+185
+933
+Krill_hibernation
+Krill_hibernation
 0
+100
+20.0
+0.1
 1
-0.2
-0.001
-1
-NIL
+%
 HORIZONTAL
 
 PLOT
@@ -1685,9 +1685,9 @@ PENS
 
 SLIDER
 15
-850
-187
-883
+715
+185
+748
 oozoid_resp
 oozoid_resp
 0
@@ -1695,14 +1695,14 @@ oozoid_resp
 3.5
 0.1
 1
-%
+% / d
 HORIZONTAL
 
 SLIDER
 15
-895
-187
-928
+755
+185
+788
 blasto_resp
 blasto_resp
 0
@@ -1710,7 +1710,7 @@ blasto_resp
 3.0
 0.1
 1
-%
+% / d
 HORIZONTAL
 
 PLOT
@@ -1754,131 +1754,131 @@ C°
 11
 
 TEXTBOX
-196
-290
-346
-308
-for salps from Groene
-12
-0.0
-1
-
-TEXTBOX
-196
-340
-346
-358
-for Salps from Groene
-12
-0.0
-1
-
-TEXTBOX
-196
-385
-346
-403
-for all from Groene
-12
-0.0
-1
-
-TEXTBOX
-196
-430
-346
-448
-for all from Groene
-12
-0.0
-1
-
-TEXTBOX
-196
-475
-346
-493
-for salps from Groene
-12
-0.0
-1
-
-TEXTBOX
-191
-505
-341
-535
-Chla production from Groene
-12
-0.0
-1
-
-TEXTBOX
-191
-550
-341
-585
-Chla decay from Groene
-12
-0.0
-1
-
-TEXTBOX
-191
-600
-341
-618
-for all from Groene
-12
-0.0
-1
-
-TEXTBOX
 190
-640
-340
+630
+350
+671
+starvation capability (Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+195
 675
-for Krill,  < 30 % (Atkins et al. 2002)
+350
+716
+daily mortality (Groeneveld et al. 2020)
 12
 0.0
 1
 
 TEXTBOX
-191
-695
-341
-713
-for salps from Groene
+195
+455
+355
+481
+(Groeneveld et al. 2020)
 12
 0.0
 1
 
 TEXTBOX
-191
-730
-341
-760
-max Chla if const food from Groene
-12
-0.0
-1
-
-TEXTBOX
-191
-775
-341
-793
-for Salps from Groene
+195
+415
+355
+441
+(Groeneveld et al. 2020)
 12
 0.0
 1
 
 TEXTBOX
 190
-810
-340
-840
-initial Krill populations size
+510
+370
+540
+immigration probability (Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+190
+230
+345
+256
+(Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+190
+275
+350
+306
+(Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+195
+325
+350
+351
+(Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+195
+900
+460
+930
+reduced metabolism of adult Krill during winter; Atkins et al. (2002): < 30 %
+12
+0.0
+1
+
+TEXTBOX
+190
+550
+355
+585
+immigration group size (Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+190
+360
+345
+401
+max Chla if const food (Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+190
+590
+360
+620
+length of individuals (Groeneveld et al. 2020)
+12
+0.0
+1
+
+TEXTBOX
+190
+820
+365
+850
+initial population size
 12
 0.0
 1
@@ -1896,9 +1896,9 @@ MONITOR
 
 TEXTBOX
 195
-850
+715
 345
-885
+750
 C loss for respiration (Iguchi 2004): 2.5-4.9
 12
 0.0
@@ -1906,10 +1906,95 @@ C loss for respiration (Iguchi 2004): 2.5-4.9
 
 TEXTBOX
 195
-895
+755
 345
-925
+785
 C loss for respiration (Iguchi 2004): 0.8-6.1
+12
+0.0
+1
+
+SLIDER
+15
+860
+185
+893
+Krill_mortality
+Krill_mortality
+0
+100
+0.15
+0.01
+1
+% / d
+HORIZONTAL
+
+TEXTBOX
+15
+490
+230
+516
+----------- Salp parameter -----------
+12
+0.0
+1
+
+TEXTBOX
+15
+800
+255
+826
+----------- Krill parameter -----------
+12
+0.0
+1
+
+TEXTBOX
+195
+860
+465
+901
+daily mortality (Ikeda & Dixon, 1982; Auerswald et al., 2015); sd = 0.09 %
+12
+0.0
+1
+
+TEXTBOX
+130
+70
+280
+110
+constant or varying Chla (external file)
+12
+0.0
+1
+
+TEXTBOX
+125
+120
+275
+150
+on: salps immigrate into the model world
+12
+0.0
+1
+
+TEXTBOX
+155
+170
+305
+200
+on: measure Salp growth
+12
+0.0
+1
+
+TEXTBOX
+15
+210
+260
+228
+----------- world parameter -----------
 12
 0.0
 1
