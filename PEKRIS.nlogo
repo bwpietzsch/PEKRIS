@@ -129,8 +129,6 @@ to setup
 
   ; calculation of chlorophyl a values ---------------------------------------------------------------------------------------------------------------;
 
-  let nstar 0                                ; nstar is the max chla value in the season
-
   ; using a lognormal distribution based on the amlr data from christion reiss and colleagues
   ifelse (PPMode = "Lognorm") [
     if (not file-exists? "chla.txt")[stop]   ; stops procedure if no file for import exists
@@ -138,18 +136,19 @@ to setup
     ifelse (file-at-end?) [
       stop                                   ; if file is at the end the simulation stops
     ][
-      set nstar ((read-from-string file-read-line) / 100) ; a new value is read in
-      set chlaK (nstar / ( 1 - chla_decay / chla_growth)) ; renormalization using the logistic equation term with loss term
+      set chlaK ((read-from-string file-read-line) / 100) ; a new value is read in
+      set chlaK (chlaK / ( 1 - chla_decay / chla_growth)) ; renormalization using the logistic equation term with loss term
     ]
   ][
   ; const max chla each year - the maximum would be than const_food each each
     set chlaK (const_food / ( 1 - chla_decay / chla_growth))
-    set nstar const_food
   ]
 
   ask patches [
-    set chla (nstar * resolution)            ; calculates amount of chla for each patch
-    set pcolor (59 - chla / 4)
+    set chla (chlaK * resolution)            ; calculates amount of chla for each patch
+    ; scale green coloring in relation to maximum possible chla value (chlaK * resolution * (1 - chla_decay / chla_growth))
+    ; and stretch it over a range of 4 color values
+    set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth) * 4))
   ]
 
   ; creation of oozoids ----------------------------------------------------------------------------------------------------------------------------- ;
@@ -864,16 +863,19 @@ to update-patches
 
   if (PPMode = "Lognorm") [
     if (ticks mod 365 = 180 - vegetation_delay) [
-      let nstar (read-from-string file-read-line) / 100
-      set chlaK (nstar / ( 1 - chla_decay / chla_growth))
+      set chlaK (read-from-string file-read-line) / 100
+      set chlaK (chlaK / ( 1 - chla_decay / chla_growth))
     ]
   ]
 
   let algae_growth (chla_growth * (0.5 * cos ((ticks + vegetation_delay) / 365 * 360) + 0.5))
 
   ask patches [
+    ; ???
     set chla (max list (chla + resolution * (algae_growth * (chla / resolution) * (1 - (chla / resolution) / chlaK) - chla_decay * (chla / resolution))) (0.005 * resolution))
-    set pcolor (59 - chla / 4)
+    ; scale green coloring in relation to maximum possible chla value (chlaK * resolution * 0.8)
+    ; and stretch it over a range of 4 color values
+    set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth) * 4))
   ]
 
 end
@@ -1350,7 +1352,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset halfsat 0.20\nset const_food 1\nset vegetation_delay 45\nset grazing_factor 0.0025\nset Salp_immiprob 0.85\nset Salp_amount 10\nset Salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset Salp_starvation 30\nset Salp_mortality 2.5\nset Krill_hibernation 20\nset Krill_amount 20\nset Krill_mortality 0.15
+set chla_growth 0.25\nset chla_decay 0.05\nset halfsat 0.20\nset const_food 0.54\nset vegetation_delay 45\nset grazing_factor 0.0025\nset Salp_immiprob 0.85\nset Salp_amount 10\nset Salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset Salp_starvation 30\nset Salp_mortality 2.5\nset Krill_hibernation 20\nset Krill_amount 20\nset Krill_mortality 0.15
 NIL
 1
 T
@@ -1600,8 +1602,8 @@ const_food
 const_food
 0
 5
-1.0
-0.001
+0.54
+0.01
 1
 NIL
 HORIZONTAL
@@ -1998,6 +2000,28 @@ TEXTBOX
 12
 0.0
 1
+
+MONITOR
+400
+455
+472
+500
+chlaK
+chlaK
+3
+1
+11
+
+MONITOR
+415
+550
+487
+595
+max chla
+max [chla] of patches
+3
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
