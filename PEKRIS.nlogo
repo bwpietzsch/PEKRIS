@@ -112,12 +112,30 @@ clutches-own [
 to setup
 
   ca                                         ; resets everything
-  file-close                                 ; make sure there is no file still open
 
   set peakabundancelist []                   ; this list stores the abundance peak in each season
   set immigrationtimelist []                 ; this list stores the time when salps enter the arena
   set regenerationtimelist []                ; this list stores the time between the first chain release and the last chain release of oozoids
   set migrationevent? false
+
+  ; section for random parameter values during sensitivity analysis
+  if SA? [
+    ; for each parameter, select a random value between 90 % and 110 % of the standard value
+    set chla_growth precision (0.9 * 0.25 + random-float (0.2 * 0.25)) 3 ; round to 3 digits
+    set chla_decay precision (0.9 * 0.05 + random-float (0.2 * 0.05)) 3 ; round to 3 digits
+    set halfsat precision (0.9 * 0.20 + random-float (0.2 * 0.20)) 3 ; round to 3 digits
+    set vegetation_delay (precision (0.9 * 45) 0 + random precision (0.2 * 45) 0)  ; round to 0 digits
+    set Salp_immiprob precision (0.9 * 0.85 + random-float (0.2 * 0.85)) 3 ; round to 3 digits
+    set Salp_amount (0.9 * 10 + random (0.2 * 10 + 1)) ; no rounding
+    set Salp_length precision (0.9 * 3 + random-float (0.2 * 3)) 1 ; round to 1 digit
+    set Salp_starvation (0.9 * 30 + random (0.2 * 30 + 1)) ; no rounding
+    set Salp_mortality precision (0.9 * 2.5 + random-float (0.2 * 2.5)) 2 ; round to 2 digits
+    set oozoid_resp precision (0.9 * 3.5 + random-float (0.2 * 3.5)) 2 ; round to 2 digits
+    set blasto_resp precision (0.9 * 3.0 + random-float (0.2 * 3.0)) 3 ; round to 3 digits
+    set Krill_amount (0.9 * 10 + random (0.2 * 10 + 1)) ; no rounding
+    set Krill_mortality precision (0.9 * 0.07 + random-float (0.2 * 0.07)) 3 ; round to 3 digits
+    set Krill_hibernation precision (0.9 * 20 + random-float (0.2 * 20)) 1 ; round to 1 digit
+  ]
 
   set monthlycount [0 0 0 0 0 0 0 0 0 0 0 0] ; here the intraannual distribution of salp abundances will be stored
 
@@ -131,21 +149,29 @@ to setup
 
   ; using a lognormal distribution based on the amlr data from christion reiss and colleagues
   ifelse (PPMode = "Lognorm") [
-    if (not file-exists? "chla.txt")[stop]   ; stops procedure if no file for import exists
-    file-open "chla.txt"                     ; opens file for import
-    ifelse (file-at-end?) [
-      stop                                   ; if file is at the end the simulation stops
-    ][
-      set chlaK ((read-from-string file-read-line) / 100) ; a new value is read in
-      set chlaK (chlaK / ( 1 - chla_decay / chla_growth)) ; renormalization using the logistic equation term with loss term
-    ]
+    random-seed 0 ; set fixed seed for every run
+    let mu 3.83 ; meanlog value from amlr data
+    let sd 0.58 ; sdlog from amlr data
+
+    ; calculate chlaK using lognormal distribution and mu and sd from amlr data
+    set chlaK (exp(mu + sd * random-normal 0 1) / 100)
+
+    ; randomize seed again
+    random-seed new-seed
+
+    ; renormalization using the logistic equation term with loss term
+    set chlaK (chlaK / (1 - chla_decay / chla_growth))
+
   ][
-  ; const max chla each year - the maximum would be than const_food each each
-    set chlaK (const_food / ( 1 - chla_decay / chla_growth))
+  ; const max chla each year using the logmean from the amlr data
+    set chlaK (log 3.83 10 / ( 1 - chla_decay / chla_growth))
   ]
 
   ask patches [
-    set chla (chlaK * resolution)            ; calculates amount of chla for each patch
+    ; calculates amount of chla for each patch (correction with decay and growth
+    ; is done to achieve the same maximum throughout the simulation if constant food supply is chosen
+    set chla (chlaK * resolution * (1 - chla_decay / chla_growth))
+
     ; scale green coloring in relation to maximum possible chla value (chlaK * resolution * (1 - chla_decay / chla_growth))
     ; and stretch it over a range of 4 color values
     set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth) * 4))
@@ -198,7 +224,7 @@ end
 
 to go
 
-  if (ticks >= 100000 or count debkrill <= 0) [stop]   ; simulation stops either after it has reached its time span or all krill have died
+  if (ticks >= 100000 or count debkrill <= 0 and sum [number] of clutches = 0) [stop]   ; simulation stops either after it has reached its time span or all krill have died
 
   let salp-set (turtle-set oozoids chains blastozoids) ; create turtle-set of all present salp life stations
   if (any? salp-set) [                                 ; check if any salps are around
@@ -221,6 +247,7 @@ to go
   update-patches                                       ; patches will be updated (e.g. chla content, density dependent krill survival)
   move                                                 ; random walk of krill and salps
   do_graphs                                            ; update plots
+
   tick                                                 ; advance time step by one
 
 end
@@ -277,15 +304,15 @@ to grow
     let fr-old fr
 
     ask oozoids-here [
-      set need (need + temp_factor * number * (grazing_factor * fr * l ^ 2)) ; for oozoids number is always one, the uptake of food depends on the squared body length
+      set need (need + temp_factor * number * (0.0025 * fr * l ^ 2)) ; for oozoids number is always one, the uptake of food depends on the squared body length
     ]
 
     ask blastozoids-here [
-      set need (need + temp_factor * number * (grazing_factor * fr * l ^ 2)) ; for blastozoids number is always one, the uptake of food depends on the squared body length
+      set need (need + temp_factor * number * (0.0025 * fr * l ^ 2)) ; for blastozoids number is always one, the uptake of food depends on the squared body length
     ]
 
     ask chains-here [
-      set need (need + temp_factor * number * (grazing_factor * fr * l ^ 2)) ; for chains number can vary, since number represents the number of blastozoids in the chain
+      set need (need + temp_factor * number * (0.0025 * fr * l ^ 2)) ; for chains number can vary, since number represents the number of blastozoids in the chain
     ]
 
     ; potential food uptake for krill
@@ -317,12 +344,12 @@ to grow
 
     ; growth of oozoids
     ask oozoids-here [
-      let carbon_assi (temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50) ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
+      let carbon_assi (temp_factor * fr * 0.0025 * l ^ 2 * 0.64 * 50) ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
       let carbon_growth (0.85 * carbon_assi)                                  ; 85% of the carbon is allocated to growth
       let carbon_repro (0.15 * carbon_assi)                                   ; 15% of the carbon is allocated to reproduction
       let oldl l
       let starvationlocal false
-      set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2))  ; reduction of the overall available chla in the patch
+      set chla (chla - temp_factor * number * (0.0025 * fr * l ^ 2))  ; reduction of the overall available chla in the patch
       let growth_resp (temp_factor * oozoid_resp / 100 * cw)                        ; respiration costs based on carbon weight (Iguchi 2004)
       ifelse (growth_resp > carbon_growth) [                                  ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                 ; if respiration can be covered by assimilated carbon
@@ -370,12 +397,12 @@ to grow
 
     ; growth of blastozoids
     ask blastozoids-here [
-      let carbon_assi temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50  ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
+      let carbon_assi temp_factor * fr * 0.0025 * l ^ 2 * 0.64 * 50  ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
       let carbon_growth (0.8 * carbon_assi)                                  ; 85% of the carbon is allocated to growth
       let carbon_repro (0.2 * carbon_assi)                                   ; 15% of the carbon is allocated to reproduction
       let oldl l
       let starvationlocal false
-      set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2)) ; reduction of the overall available chla in the patch
+      set chla (chla - temp_factor * number * (0.0025 * fr * l ^ 2)) ; reduction of the overall available chla in the patch
       let growth_resp (temp_factor * blasto_resp / 100 * cw)                 ; respiration costs based on carbon weight (Iguchi 2004)
       ifelse (growth_resp > carbon_growth) [                                 ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                ; if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
@@ -413,12 +440,12 @@ to grow
 
     ; growth of chains
     ask chains-here [
-      let carbon_assi (temp_factor * fr * grazing_factor * l ^ 2 * 0.64 * 50)
+      let carbon_assi (temp_factor * fr * 0.0025 * l ^ 2 * 0.64 * 50)
       let carbon_growth (0.85 * carbon_assi)
       let carbon_repro (0.15 * carbon_assi)
       let oldl l
       let starvationlocal false
-      set chla (chla - temp_factor * number * (grazing_factor * fr * l ^ 2))
+      set chla (chla - temp_factor * number * (0.0025 * fr * l ^ 2))
       let growth_resp (temp_factor * blasto_resp / 100 * cw)
       ifelse (growth_resp > carbon_growth) [                                   ; if respiration is higher than carbon allocated to growth
         ifelse growth_resp < (carbon_growth + carbon_repro) [                  ; if respiration is higher than the carbon allocated to growth and the reprobuffer the animal starves
@@ -863,16 +890,28 @@ to update-patches
 
   if (PPMode = "Lognorm") [
     if (ticks mod 365 = 180 - vegetation_delay) [
-      set chlaK (read-from-string file-read-line) / 100
-      set chlaK (chlaK / ( 1 - chla_decay / chla_growth))
+      random-seed ((floor (ticks / 365) + 1) * 10) ; set a fixed seed for each year
+      let mu 3.83 ; meanlog from amlr data
+      let sd 0.58 ; sdlog from amlr data
+
+      ; calculate chlaK using meanlog and sdlog from the amlr data
+      set chlaK (exp(mu + sd * random-normal 0 1) / 100)
+
+      ; randomized seed
+      random-seed new-seed
+
+      ; renormalization using the logistic equation term with loss term
+      set chlaK (chlaK / (1 - chla_decay / chla_growth))
     ]
   ]
 
+  ; ?
   let algae_growth (chla_growth * (0.5 * cos ((ticks + vegetation_delay) / 365 * 360) + 0.5))
 
   ask patches [
-    ; ???
+    ; update chla value: if chla is below 0.005 per m³, it is set to 0.005 per m³ to avoid chla depletion due to diffusion for example
     set chla (max list (chla + resolution * (algae_growth * (chla / resolution) * (1 - (chla / resolution) / chlaK) - chla_decay * (chla / resolution))) (0.005 * resolution))
+
     ; scale green coloring in relation to maximum possible chla value (chlaK * resolution * 0.8)
     ; and stretch it over a range of 4 color values
     set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth) * 4))
@@ -1040,9 +1079,9 @@ to plot-histo
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-350
+380
 10
-762
+792
 423
 -1
 -1
@@ -1101,9 +1140,9 @@ NIL
 1
 
 PLOT
-775
+795
 10
-1005
+1025
 295
 Abundances
 NIL
@@ -1120,9 +1159,9 @@ PENS
 "Solitaries" 1.0 0 -2674135 true "" "plotxy (ticks)  n_oozoids"
 
 PLOT
-1010
+1030
 10
-1170
+1190
 295
 Mean Chla (scaled from 1 to 0)
 NIL
@@ -1139,9 +1178,9 @@ PENS
 "pen-1" 1.0 0 -13840069 true "" "plot max [chla] of patches / resolution"
 
 PLOT
-520
+540
 465
-785
+805
 745
 Histogram Oozoids lengths (cm)
 NIL
@@ -1157,9 +1196,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-790
+810
 465
-1041
+1061
 745
 Histogram Blastozoids lengths (cm)
 NIL
@@ -1193,9 +1232,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-944
+964
 754
-1133
+1153
 900
 Age of Blastozoids
 NIL
@@ -1211,9 +1250,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-1437
+1457
 465
-1726
+1746
 740
 Growth Rates Oozoids
 NIL
@@ -1229,9 +1268,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-1430
+1450
 760
-1724
+1744
 964
 Growth Rates Blastozoids
 NIL
@@ -1247,9 +1286,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 MONITOR
-1540
+1560
 300
-1615
+1635
 345
 NIL
 mean gr-o
@@ -1258,9 +1297,9 @@ mean gr-o
 11
 
 MONITOR
-1620
+1640
 300
-1700
+1720
 345
 NIL
 mean gr-b
@@ -1270,9 +1309,9 @@ mean gr-b
 
 SLIDER
 15
-630
+545
 185
-663
+578
 Salp_starvation
 Salp_starvation
 0
@@ -1284,9 +1323,9 @@ d
 HORIZONTAL
 
 PLOT
-519
+539
 755
-934
+954
 970
 Annual distribution
 NIL
@@ -1303,9 +1342,9 @@ PENS
 
 SLIDER
 16
-675
+590
 186
-708
+623
 Salp_mortality
 Salp_mortality
 0
@@ -1318,24 +1357,9 @@ HORIZONTAL
 
 SLIDER
 15
-445
-187
-478
-grazing_factor
-grazing_factor
-0
-2
-0.0025
-0.001
-1
-NIL
-HORIZONTAL
-
-SLIDER
-15
-405
+360
 185
-438
+393
 vegetation_delay
 vegetation_delay
 0
@@ -1352,7 +1376,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset halfsat 0.20\nset const_food 0.54\nset vegetation_delay 45\nset grazing_factor 0.0025\nset Salp_immiprob 0.85\nset Salp_amount 10\nset Salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset Salp_starvation 30\nset Salp_mortality 2.5\nset Krill_hibernation 20\nset Krill_amount 20\nset Krill_mortality 0.15
+set chla_growth 0.25\nset chla_decay 0.05\nset halfsat 0.20\nset vegetation_delay 45\nset Salp_immiprob 0.85\nset Salp_amount 10\nset Salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset Salp_starvation 30\nset Salp_mortality 2.5\nset Krill_hibernation 20\nset Krill_amount 10\nset Krill_mortality 0.07
 NIL
 1
 T
@@ -1364,9 +1388,9 @@ NIL
 1
 
 PLOT
-1156
+1176
 756
-1422
+1442
 1056
 Chain releases
 NIL
@@ -1382,9 +1406,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-1045
+1065
 465
-1430
+1450
 745
 Seasonal repoduction cycles
 NIL
@@ -1400,9 +1424,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-1152
+1172
 301
-1323
+1343
 453
 Bud/Oozoid
 NIL
@@ -1418,9 +1442,9 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 MONITOR
-1620
+1640
 350
-1700
+1720
 395
 Max Density
 precision (maxn /  (101 * 101 * 16)) 2
@@ -1429,9 +1453,9 @@ precision (maxn /  (101 * 101 * 16)) 2
 11
 
 PLOT
-785
+805
 302
-945
+965
 452
 Temp_Factor
 NIL
@@ -1454,12 +1478,12 @@ CHOOSER
 PPMode
 PPMode
 "Const" "Lognorm"
-0
+1
 
 PLOT
-951
+971
 302
-1151
+1171
 452
 Salp peaks
 NIL
@@ -1476,9 +1500,9 @@ PENS
 
 SLIDER
 15
-510
+425
 185
-543
+458
 Salp_immiprob
 Salp_immiprob
 0
@@ -1492,7 +1516,7 @@ HORIZONTAL
 SLIDER
 15
 230
-187
+185
 263
 chla_growth
 chla_growth
@@ -1547,9 +1571,9 @@ HORIZONTAL
 
 SLIDER
 15
-550
+465
 187
-583
+498
 Salp_amount
 Salp_amount
 0
@@ -1562,9 +1586,9 @@ HORIZONTAL
 
 SLIDER
 15
-590
+505
 187
-623
+538
 Salp_length
 Salp_length
 0
@@ -1576,9 +1600,9 @@ cm
 HORIZONTAL
 
 PLOT
-1175
+1195
 10
-1374
+1394
 291
 Krill Growth Curves
 NIL
@@ -1595,29 +1619,14 @@ PENS
 
 SLIDER
 15
-360
-187
-393
-const_food
-const_food
-0
-5
-0.54
-0.01
-1
-NIL
-HORIZONTAL
-
-SLIDER
-15
-820
+730
 185
-853
+763
 Krill_amount
 Krill_amount
 0
 2000
-20.0
+10.0
 1
 1
 n
@@ -1636,9 +1645,9 @@ salps?
 
 SLIDER
 15
-900
+810
 185
-933
+843
 Krill_hibernation
 Krill_hibernation
 0
@@ -1650,9 +1659,9 @@ Krill_hibernation
 HORIZONTAL
 
 PLOT
-1380
+1400
 10
-1550
+1570
 290
 Krill abundance
 NIL
@@ -1668,9 +1677,9 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count debkrill + sum [number] of clutches"
 
 PLOT
-1330
+1350
 300
-1530
+1550
 450
 Maximum krill life time spawn events 
 NIL
@@ -1687,9 +1696,9 @@ PENS
 
 SLIDER
 15
-715
+630
 185
-748
+663
 oozoid_resp
 oozoid_resp
 0
@@ -1702,9 +1711,9 @@ HORIZONTAL
 
 SLIDER
 15
-755
+670
 185
-788
+703
 blasto_resp
 blasto_resp
 0
@@ -1716,9 +1725,9 @@ blasto_resp
 HORIZONTAL
 
 PLOT
-1555
+1575
 10
-1730
+1750
 290
 Abundance adult krill
 NIL
@@ -1734,9 +1743,9 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count debkrill"
 
 MONITOR
-1540
+1560
 400
-1615
+1635
 445
 NIL
 max_gen
@@ -1745,9 +1754,9 @@ max_gen
 11
 
 MONITOR
-1620
+1640
 400
-1695
+1715
 445
 C°
 (cos ((ticks) / 365 * 360) * 2 + 273) - 273
@@ -1757,9 +1766,9 @@ C°
 
 TEXTBOX
 190
-630
+545
 350
-671
+586
 starvation capability (Groeneveld et al. 2020)
 12
 0.0
@@ -1767,9 +1776,9 @@ starvation capability (Groeneveld et al. 2020)
 
 TEXTBOX
 195
-675
+590
 350
-716
+631
 daily mortality (Groeneveld et al. 2020)
 12
 0.0
@@ -1777,19 +1786,9 @@ daily mortality (Groeneveld et al. 2020)
 
 TEXTBOX
 195
-455
+370
 355
-481
-(Groeneveld et al. 2020)
-12
-0.0
-1
-
-TEXTBOX
-195
-415
-355
-441
+396
 (Groeneveld et al. 2020)
 12
 0.0
@@ -1797,9 +1796,9 @@ TEXTBOX
 
 TEXTBOX
 190
-510
+425
 370
-540
+455
 immigration probability (Groeneveld et al. 2020)
 12
 0.0
@@ -1808,9 +1807,9 @@ immigration probability (Groeneveld et al. 2020)
 TEXTBOX
 190
 230
-345
-256
-(Groeneveld et al. 2020)
+360
+271
+rate of primary production (Groeneveld et al. 2020)
 12
 0.0
 1
@@ -1827,9 +1826,9 @@ TEXTBOX
 
 TEXTBOX
 195
-325
+320
 350
-351
+346
 (Groeneveld et al. 2020)
 12
 0.0
@@ -1837,19 +1836,19 @@ TEXTBOX
 
 TEXTBOX
 195
-900
+810
 460
-930
-reduced metabolism of adult Krill during winter; Atkins et al. (2002): < 30 %
+840
+reduced metabolism of adult Krill during winter; Atkinson et al. (2002): < 30 %
 12
 0.0
 1
 
 TEXTBOX
 190
-550
+465
 355
-585
+500
 immigration group size (Groeneveld et al. 2020)
 12
 0.0
@@ -1857,19 +1856,9 @@ immigration group size (Groeneveld et al. 2020)
 
 TEXTBOX
 190
+505
 360
-345
-401
-max Chla if const food (Groeneveld et al. 2020)
-12
-0.0
-1
-
-TEXTBOX
-190
-590
-360
-620
+535
 length of individuals (Groeneveld et al. 2020)
 12
 0.0
@@ -1877,18 +1866,18 @@ length of individuals (Groeneveld et al. 2020)
 
 TEXTBOX
 190
-820
+730
 365
-850
+760
 initial population size
 12
 0.0
 1
 
 MONITOR
-1540
+1560
 350
-1615
+1635
 395
 # krill
 (count debkrill) + (round (sum [number] of clutches))
@@ -1898,9 +1887,9 @@ MONITOR
 
 TEXTBOX
 195
-715
+630
 345
-750
+665
 C loss for respiration (Iguchi 2004): 2.5-4.9
 12
 0.0
@@ -1908,9 +1897,9 @@ C loss for respiration (Iguchi 2004): 2.5-4.9
 
 TEXTBOX
 195
-755
+670
 345
-785
+700
 C loss for respiration (Iguchi 2004): 0.8-6.1
 12
 0.0
@@ -1918,24 +1907,24 @@ C loss for respiration (Iguchi 2004): 0.8-6.1
 
 SLIDER
 15
-860
+770
 185
-893
+803
 Krill_mortality
 Krill_mortality
 0
 100
-0.15
+0.07
 0.01
 1
 % / d
 HORIZONTAL
 
 TEXTBOX
-15
-490
-230
-516
+20
+405
+235
+431
 ----------- Salp parameter -----------
 12
 0.0
@@ -1943,9 +1932,9 @@ TEXTBOX
 
 TEXTBOX
 15
-800
+710
 255
-826
+736
 ----------- Krill parameter -----------
 12
 0.0
@@ -1953,10 +1942,10 @@ TEXTBOX
 
 TEXTBOX
 195
-860
-465
-901
-daily mortality (Ikeda & Dixon, 1982; Auerswald et al., 2015); sd = 0.09 %
+770
+350
+811
+daily mortality (Auerswald et al., 2015)
 12
 0.0
 1
@@ -2001,25 +1990,25 @@ TEXTBOX
 0.0
 1
 
-MONITOR
-400
-455
-472
-500
-chlaK
-chlaK
-3
+SWITCH
+270
+65
+373
+98
+SA?
+SA?
 1
-11
+1
+-1000
 
 MONITOR
-415
-550
-487
-595
-max chla
-max [chla] of patches
-3
+445
+490
+502
+535
+year
+floor (ticks / 365) + 1
+0
 1
 11
 
