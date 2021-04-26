@@ -149,12 +149,12 @@ to setup
 
   ; using a lognormal distribution based on the amlr data from christion reiss and colleagues
   ifelse (PPMode = "Lognorm") [
-    random-seed 0 ; set fixed seed for every run
+    random-seed 0 ; set fixed seed from interface input
     let mu 3.83 ; meanlog value from amlr data
     let sd 0.58 ; sdlog from amlr data
 
     ; calculate chlaK using lognormal distribution and mu and sd from amlr data
-    set chlaK (exp(mu + sd * random-normal 0 1) / 100)
+    set chlaK (e ^ (mu + sd * (random-normal 0 1)) / 100)
 
     ; randomize seed again
     random-seed new-seed
@@ -174,7 +174,7 @@ to setup
 
     ; scale green coloring in relation to maximum possible chla value (chlaK * resolution * (1 - chla_decay / chla_growth))
     ; and stretch it over a range of 4 color values
-    set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth) * 4))
+    set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth)) * 4)
   ]
 
   ; creation of oozoids ----------------------------------------------------------------------------------------------------------------------------- ;
@@ -246,7 +246,7 @@ to go
 
   update-patches                                       ; patches will be updated (e.g. chla content, density dependent krill survival)
   move                                                 ; random walk of krill and salps
-  do_graphs                                            ; update plots
+  ;do_graphs                                            ; update plots
 
   tick                                                 ; advance time step by one
 
@@ -835,7 +835,7 @@ to death
   ask debkrill [
     set age (age + 1)
     if (age > (6 * 365)) or (random-float 1 < (Krill_mortality / 100))[die]
-    ; daily mortality calculated from data of Ikeda & Dixon (1982) as well as Auerswald et al. (2015)
+    ; daily mortality from Auerswald et al. (2015)
   ]
 
   ; To reduce computational effort in the beginning clutches are computed as cohorts.
@@ -890,13 +890,16 @@ to update-patches
 
   if (PPMode = "Lognorm") [
     if (ticks mod 365 = 180 - vegetation_delay) [
-      random-seed ((floor (ticks / 365) + 1) * 10) ; set a fixed seed for each year
+      ; set fixed random seed
+      random-seed 0
       let mu 3.83 ; meanlog from amlr data
       let sd 0.58 ; sdlog from amlr data
 
-      ; calculate chlaK using meanlog and sdlog from the amlr data
-      set chlaK (exp(mu + sd * random-normal 0 1) / 100)
-
+      ; repeat calclulation to match given year number
+      repeat (ceiling (ticks / 365) + 1) [
+        ; calculate chlaK using meanlog and sdlog from the amlr data
+        set chlaK (e ^ (mu + sd * (random-normal 0 1)) / 100)
+      ]
       ; randomized seed
       random-seed new-seed
 
@@ -904,6 +907,7 @@ to update-patches
       set chlaK (chlaK / (1 - chla_decay / chla_growth))
     ]
   ]
+
 
   ; ?
   let algae_growth (chla_growth * (0.5 * cos ((ticks + vegetation_delay) / 365 * 360) + 0.5))
@@ -914,7 +918,7 @@ to update-patches
 
     ; scale green coloring in relation to maximum possible chla value (chlaK * resolution * 0.8)
     ; and stretch it over a range of 4 color values
-    set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth) * 4))
+    set pcolor (59 - chla / (chlaK * resolution * (1 - chla_decay / chla_growth)) * 4)
   ]
 
 end
@@ -1639,7 +1643,7 @@ SWITCH
 156
 salps?
 salps?
-0
+1
 1
 -1000
 
@@ -2002,13 +2006,24 @@ SA?
 -1000
 
 MONITOR
-445
-490
-502
-535
+435
+435
+492
+480
 year
 floor (ticks / 365) + 1
 0
+1
+11
+
+MONITOR
+435
+485
+510
+530
+NIL
+chlaK
+3
 1
 11
 
