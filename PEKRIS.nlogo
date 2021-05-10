@@ -226,6 +226,11 @@ to go
 
   if (ticks >= 100000 or count debkrill <= 0 and sum [number] of clutches = 0) [stop]   ; simulation stops either after it has reached its time span or all krill have died
 
+  if SA? [
+    if (max [age] of debkrill >= 6 * 365) [
+      stop
+    ]
+  ]
   let salp-set (turtle-set oozoids chains blastozoids) ; create turtle-set of all present salp life stations
   if (any? salp-set) [                                 ; check if any salps are around
     set max_gen (max [generation] of (salp-set ))      ; store the highest generation time reflecting number of life cycles
@@ -1320,7 +1325,7 @@ Salp_starvation
 Salp_starvation
 0
 1000
-30.0
+27.0
 1
 1
 d
@@ -1353,7 +1358,7 @@ Salp_mortality
 Salp_mortality
 0
 100
-2.5
+2.56
 0.1
 1
 % / d
@@ -1368,7 +1373,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-45.0
+42.0
 1
 1
 d
@@ -1482,7 +1487,7 @@ CHOOSER
 PPMode
 PPMode
 "Const" "Lognorm"
-1
+0
 
 PLOT
 971
@@ -1511,7 +1516,7 @@ Salp_immiprob
 Salp_immiprob
 0
 100
-0.85
+0.867
 0.01
 1
 %
@@ -1526,7 +1531,7 @@ chla_growth
 chla_growth
 0
 1
-0.25
+0.267
 0.01
 1
 NIL
@@ -1541,7 +1546,7 @@ chla_decay
 chla_decay
 0
 1
-0.05
+0.048
 0.01
 1
 NIL
@@ -1567,7 +1572,7 @@ halfsat
 halfsat
 0
 1
-0.2
+0.195
 0.01
 1
 mg Chla / m³
@@ -1582,7 +1587,7 @@ Salp_amount
 Salp_amount
 0
 100
-10.0
+11.0
 1
 1
 n
@@ -1643,7 +1648,7 @@ SWITCH
 156
 salps?
 salps?
-1
+0
 1
 -1000
 
@@ -1656,7 +1661,7 @@ Krill_hibernation
 Krill_hibernation
 0
 100
-20.0
+20.7
 0.1
 1
 %
@@ -1707,7 +1712,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-3.5
+3.45
 0.1
 1
 % / d
@@ -1722,7 +1727,7 @@ blasto_resp
 blasto_resp
 0
 100
-3.0
+3.059
 0.1
 1
 % / d
@@ -1918,7 +1923,7 @@ Krill_mortality
 Krill_mortality
 0
 100
-0.07
+0.069
 0.01
 1
 % / d
@@ -1955,11 +1960,11 @@ daily mortality (Auerswald et al., 2015)
 1
 
 TEXTBOX
-130
+120
 70
-280
-110
-constant or varying Chla (external file)
+290
+111
+constant or varying Chla (based on AMLR data)
 12
 0.0
 1
@@ -1995,13 +2000,13 @@ TEXTBOX
 1
 
 SWITCH
-270
-65
-373
-98
+410
+590
+513
+623
 SA?
 SA?
-1
+0
 1
 -1000
 
@@ -2402,414 +2407,23 @@ NetLogo 6.1.1
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
+  <experiment name="SA" repetitions="500" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
-    <timeLimit steps="2910"/>
-    <metric>mean [l] of debkrill</metric>
-    <metric>min [l] of debkrill</metric>
-    <metric>max [l] of debkrill</metric>
-    <metric>mean [spawningevent] of debkrill</metric>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="ni">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rchla">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="sizeofmigra">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="N_krill">
-      <value value="50"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="const_food">
-      <value value="1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Chains?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="grazing_factor">
-      <value value="0.0025"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="PPMode">
-      <value value="&quot;Const&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-o">
-      <value value="0.027"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="DailyMort">
-      <value value="0.02"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-b">
-      <value value="0.0155"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="immiprob">
-      <value value="0.0085"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="deltachla">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="experiment2" repetitions="100" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2910"/>
-    <metric>mean [l] of debkrill</metric>
-    <metric>mean [spawningevent] of debkrill</metric>
-    <metric>mean peakabundancelist</metric>
-    <metric>max  peakabundancelist</metric>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="ni">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rchla">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="sizeofmigra">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="N_krill">
-      <value value="1"/>
-      <value value="50"/>
-      <value value="100"/>
-      <value value="500"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="const_food">
-      <value value="1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Chains?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="grazing_factor">
-      <value value="0.0025"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salps?">
-      <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="PPMode">
-      <value value="&quot;Const&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-o">
-      <value value="0.027"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="DailyMort">
-      <value value="0.02"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-b">
-      <value value="0.0155"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="immiprob">
-      <value value="0.0085"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="deltachla">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="experimentfood05" repetitions="100" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2910"/>
-    <metric>mean [l] of debkrill</metric>
-    <metric>mean [spawningevent] of debkrill</metric>
-    <metric>mean peakabundancelist</metric>
-    <metric>max  peakabundancelist</metric>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="ni">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rchla">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="sizeofmigra">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="N_krill">
-      <value value="1"/>
-      <value value="50"/>
-      <value value="100"/>
-      <value value="500"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="const_food">
-      <value value="0.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Chains?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="grazing_factor">
-      <value value="0.0025"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salps?">
-      <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="PPMode">
-      <value value="&quot;Const&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-o">
-      <value value="0.027"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="DailyMort">
-      <value value="0.02"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-b">
-      <value value="0.0155"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="immiprob">
-      <value value="0.0085"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="deltachla">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="experimentfood15" repetitions="100" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2910"/>
-    <metric>mean [l] of debkrill</metric>
-    <metric>mean [spawningevent] of debkrill</metric>
-    <metric>mean peakabundancelist</metric>
-    <metric>max  peakabundancelist</metric>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="ni">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rchla">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="sizeofmigra">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="N_krill">
-      <value value="1"/>
-      <value value="50"/>
-      <value value="100"/>
-      <value value="500"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="const_food">
-      <value value="1.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Chains?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="grazing_factor">
-      <value value="0.0025"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salps?">
-      <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="PPMode">
-      <value value="&quot;Const&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-o">
-      <value value="0.027"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="DailyMort">
-      <value value="0.02"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-b">
-      <value value="0.0155"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="immiprob">
-      <value value="0.0085"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="deltachla">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="experimentvegdelay90" repetitions="100" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2910"/>
-    <metric>mean [l] of debkrill</metric>
-    <metric>mean [spawningevent] of debkrill</metric>
-    <metric>mean peakabundancelist</metric>
-    <metric>max  peakabundancelist</metric>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="90"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="ni">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rchla">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="sizeofmigra">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="N_krill">
-      <value value="1"/>
-      <value value="50"/>
-      <value value="100"/>
-      <value value="500"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="const_food">
-      <value value="1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Chains?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="grazing_factor">
-      <value value="0.0025"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salps?">
-      <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="PPMode">
-      <value value="&quot;Const&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-o">
-      <value value="0.027"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="DailyMort">
-      <value value="0.02"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-b">
-      <value value="0.0155"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="immiprob">
-      <value value="0.0085"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="deltachla">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="experimentfullfactorial" repetitions="5" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2910"/>
-    <metric>mean [l] of debkrill</metric>
-    <metric>mean [spawningevent] of debkrill</metric>
-    <metric>mean peakabundancelist</metric>
-    <metric>max  peakabundancelist</metric>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="30"/>
-      <value value="45"/>
-      <value value="60"/>
-      <value value="75"/>
-      <value value="90"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="ni">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rchla">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="sizeofmigra">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="N_krill">
-      <value value="1"/>
-      <value value="50"/>
-      <value value="100"/>
-      <value value="200"/>
-      <value value="300"/>
-      <value value="400"/>
-      <value value="500"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="const_food">
-      <value value="0.5"/>
-      <value value="0.75"/>
-      <value value="1"/>
-      <value value="1.25"/>
-      <value value="1.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Chains?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="grazing_factor">
-      <value value="0.005"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salps?">
-      <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="PPMode">
-      <value value="&quot;Const&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-o">
-      <value value="0.027"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="DailyMort">
-      <value value="0.02"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="rb-b">
-      <value value="0.0155"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="immiprob">
-      <value value="0.0085"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="deltachla">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Hibernationfactor">
-      <value value="1"/>
-    </enumeratedValueSet>
+    <metric>vegetation_delay</metric>
+    <metric>oozoid_resp</metric>
+    <metric>Krill_amount</metric>
+    <metric>chla_growth</metric>
+    <metric>Salp_immiprob</metric>
+    <metric>Salp_mortality</metric>
+    <metric>Krill_mortality</metric>
+    <metric>blasto_resp</metric>
+    <metric>Salp_amount</metric>
+    <metric>chla_decay</metric>
+    <metric>Salp_length</metric>
+    <metric>Salp_starvation</metric>
+    <metric>Krill_hibernation</metric>
+    <metric>halfsat</metric>
   </experiment>
 </experiments>
 @#$#@#$#@
