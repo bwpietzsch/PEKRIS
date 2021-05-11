@@ -25,6 +25,7 @@ globals [
   chlaK                     ; maximum chla density in the season
   peakabundance             ; maximum abundance of salps in the season
   peakabundancelist         ; list of peak abundances
+  medabund                  ; median of Salp peakabundances
   max_gen                   ; max number of reproductive cycles of salps in one season
   n_oozoids                 ; number of oozoids in the world
   n_blasto                  ; number of blastozoids in the world
@@ -35,7 +36,9 @@ globals [
   peakimmigrationtime       ; this variable store the maximum immigration time during a season
   migrationevent?           ; true if a migration event happened during this season
   T                         ; daily temperature (Kelvin)
-  maxspawn                  ; maximum spawn events of single krill
+  maxspawn                  ; maximum spawn events of single Krill
+  maxsize                   ; maximum size (l) of single Krill
+  maxabund                  ; maximum abundance of Krill
 ]
 
 oozoids-own [
@@ -120,21 +123,25 @@ to setup
 
   ; section for random parameter values during sensitivity analysis
   if SA? [
-    ; for each parameter, select a random value between 90 % and 110 % of the standard value
-    set chla_growth precision (0.9 * 0.25 + random-float (0.2 * 0.25)) 3 ; round to 3 digits
-    set chla_decay precision (0.9 * 0.05 + random-float (0.2 * 0.05)) 3 ; round to 3 digits
-    set halfsat precision (0.9 * 0.20 + random-float (0.2 * 0.20)) 3 ; round to 3 digits
-    set vegetation_delay (precision (0.9 * 45) 0 + random precision (0.2 * 45) 0)  ; round to 0 digits
-    set Salp_immiprob precision (0.9 * 0.85 + random-float (0.2 * 0.85)) 3 ; round to 3 digits
-    set Salp_amount (0.9 * 10 + random (0.2 * 10 + 1)) ; no rounding
-    set Salp_length precision (0.9 * 3 + random-float (0.2 * 3)) 1 ; round to 1 digit
-    set Salp_starvation (0.9 * 30 + random (0.2 * 30 + 1)) ; no rounding
-    set Salp_mortality precision (0.9 * 2.5 + random-float (0.2 * 2.5)) 2 ; round to 2 digits
-    set oozoid_resp precision (0.9 * 3.5 + random-float (0.2 * 3.5)) 2 ; round to 2 digits
-    set blasto_resp precision (0.9 * 3.0 + random-float (0.2 * 3.0)) 3 ; round to 3 digits
-    set Krill_amount (0.9 * 10 + random (0.2 * 10 + 1)) ; no rounding
-    set Krill_mortality precision (0.9 * 0.07 + random-float (0.2 * 0.07)) 3 ; round to 3 digits
-    set Krill_hibernation precision (0.9 * 20 + random-float (0.2 * 20)) 1 ; round to 1 digit
+    let SArange 0.5          ; define parameter deviation for SA
+    let SAmin (1 - SArange)  ; define minimum level for SA
+    let SAspan (2 * SArange) ; define parameter range for SA
+
+    ; for each parameter, select a random value between min (SAmin) and max (min + SAspan)
+    set chla_growth precision (SAmin * 0.25 + random-float (SAspan * 0.25)) 3           ; round to 3 digits
+    set chla_decay precision (SAmin * 0.05 + random-float (SAspan * 0.05)) 3            ; round to 3 digits
+    set halfsat precision (SAmin * 0.20 + random-float (SAspan * 0.20)) 3               ; round to 3 digits
+    set vegetation_delay (precision (SAmin * 45) 0 + random precision (SAspan * 45) 0)  ; round to 0 digits
+    set Salp_immiprob (precision (SAmin * 0.85 + random-float (SAspan * 0.85)) 3)       ; round to 3 digits
+    set Salp_amount (SAmin * 10 + random (SAspan * 10 + 1))                             ; no rounding
+    set Salp_length (precision (SAmin * 3 + random-float (SAspan * 3)) 1)               ; round to 1 digit
+    set Salp_starvation (SAmin * 30 + random (SAspan * 30 + 1))                         ; no rounding
+    set Salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)        ; round to 2 digits
+    set oozoid_resp (precision (SAmin * 3.5 + random-float (SAspan * 3.5)) 2)           ; round to 2 digits
+    set blasto_resp (precision (SAmin * 3.0 + random-float (SAspan * 3.0)) 3)           ; round to 3 digits
+    set Krill_amount (SAmin * 30 + random (SAspan * 30 + 1))                            ; no rounding
+    set Krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)     ; round to 3 digits
+    set Krill_hibernation (precision (SAmin * 20 + random-float (SAspan * 20)) 1)       ; round to 1 digit
   ]
 
   set monthlycount [0 0 0 0 0 0 0 0 0 0 0 0] ; here the intraannual distribution of salp abundances will be stored
@@ -212,8 +219,6 @@ to setup
     set color black               ; krill are displayed as black
   ]
 
-  set maxspawn 0                  ; maximum spawn events of single krill
-
   reset-ticks                     ; update all plots and start the NetLogo clock
 
 end
@@ -226,11 +231,8 @@ to go
 
   if (ticks >= 100000 or count debkrill <= 0 and sum [number] of clutches = 0) [stop]   ; simulation stops either after it has reached its time span or all krill have died
 
-  if SA? [
-    if (max [age] of debkrill >= 6 * 365) [
-      stop
-    ]
-  ]
+  if SA? and (ticks >= (6 * 365 - 30)) [stop]          ; stop simulation during SA if one Krill lifecycle finished (6 years minus 30 days)
+
   let salp-set (turtle-set oozoids chains blastozoids) ; create turtle-set of all present salp life stations
   if (any? salp-set) [                                 ; check if any salps are around
     set max_gen (max [generation] of (salp-set ))      ; store the highest generation time reflecting number of life cycles
@@ -251,7 +253,10 @@ to go
 
   update-patches                                       ; patches will be updated (e.g. chla content, density dependent krill survival)
   move                                                 ; random walk of krill and salps
-  ;do_graphs                                            ; update plots
+  calc_globals                                         ; calculate globals and results
+  if plots? [
+    do_graphs                                            ; update plots
+  ]
 
   tick                                                 ; advance time step by one
 
@@ -272,9 +277,11 @@ to detreprocyclesalp
     set generation 0
   ]
 
-  ; update Plot on reproduction cycles
-  set-current-plot "Seasonal repoduction cycles"
-  plot rc / 2
+  if plots?[
+    ; update Plot on reproduction cycles
+    set-current-plot "Seasonal repoduction cycles"
+    plot rc / 2
+  ]
 
 end
 
@@ -952,10 +959,9 @@ to move
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; update all plots                    ;
+; calculate globals                   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to do_graphs
+to calc_globals
 
   let index3 (floor ((ticks mod 365) / 30.5)) ; calculate month number based on ticks
 
@@ -964,8 +970,6 @@ to do_graphs
 
   set n_oozoids (count oozoids) ; counting oozoids
   set n_blasto (count blastozoids + sum [number] of chains); counting all blastozoids, males and females
-
-  plot-histo ; update histograms
 
   set maxn (max (list maxn (n_oozoids + n_blasto))); maximum salp abundance during the simulation run
 
@@ -982,31 +986,74 @@ to do_graphs
     set peakimmigrationtime immigrationtime
   ]
 
-  if (ticks mod 365 = 210) [                                     ; end of july, at the end of the Southern winter when abundances should be really low
-    set peakabundancelist (lput peakabundance peakabundancelist) ; in peakabundancelist the highest salp abundance is stored that occured in the season (here the season ends after 210 days, i.e. end of July)
-    ifelse migrationevent? = true [ ; only if in that season migration has happened it make sense to store the time
+  if (count debkrill > 0) [
+    ; calculate max spawning events
+    set maxspawn max (list maxspawn (max [spawningevent] of debkrill))
+
+    ; calculate max abundance
+    set maxabund max (list maxabund (precision (count debkrill + sum [number] of clutches) 0))
+
+    ; calc max size
+    set maxsize max (list maxsize (precision (max [l] of debkrill) 2))
+  ]
+
+  ; end of july, at the end of the Southern winter when abundances should be really low
+  if (ticks mod 365 = 210) [
+    ; in peakabundancelist the highest salp abundance is stored that occured in the season (here the season ends after 210 days, i.e. end of July)
+    set peakabundancelist (lput peakabundance peakabundancelist)
+    ; only if in that season migration has happened it make sense to store the time
+    ifelse migrationevent? = true [
       set immigrationtimelist lput peakimmigrationtime immigrationtimelist
       set migrationevent? false
-    ][ ; -1 indicates that no migration event has happened in that particular season
+    ][
+      ; -1 indicates that no migration event has happened in that particular season
       set immigrationtimelist lput -1 immigrationtimelist
     ]
 
-    set-current-plot "Salp peaks"
-    plot peakabundance
-    set peakabundance 0; resetting peakabundance
-  ]
+    if plots? [
+      set-current-plot "Salp peaks"
+      plot peakabundance
+    ]
 
-  if (count debkrill > 0) [ ; maxspawn is the highest number of spawning events that one krill had in its life time
-    set maxspawn max (list maxspawn (max [spawningevent] of debkrill))
+    ; resetting peakabundance
+    set peakabundance 0
+
+    set medabund (median peakabundancelist)
   ]
 
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; update histograms                   ;
+; update all plots                    ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to plot-histo
+to do_graphs
+
+  set-current-plot "Abundances"
+  set-current-plot-pen "Aggregates"
+  plotxy (ticks) n_blasto
+  set-current-plot-pen "Solitaries"
+  plotxy (ticks)  n_oozoids
+
+  set-current-plot "Max Chla"
+  set-current-plot-pen "pen-1"
+  plotxy (ticks) (max [chla] of patches / resolution)
+
+  set-current-plot "Maximum krill life time spawn events"
+  set-current-plot-pen "default"
+  plotxy (ticks) maxspawn
+
+  set-current-plot "Krill abundance"
+  set-current-plot-pen "default"
+  plotxy (ticks) (count debkrill + sum [number] of clutches)
+
+  set-current-plot "Abundance adult Krill"
+  set-current-plot-pen "default"
+  plotxy (ticks) (count debkrill)
+
+  set-current-plot "Temp_Factor"
+  set-current-plot-pen "default"
+  plot temp_factor
 
   set-current-plot "Histogram Oozoids lengths (cm)"
   set-plot-pen-mode 1
@@ -1164,15 +1211,15 @@ true
 true
 "" ""
 PENS
-"Aggregates" 1.0 0 -16777216 true "" "plotxy (ticks) n_blasto"
-"Solitaries" 1.0 0 -2674135 true "" "plotxy (ticks)  n_oozoids"
+"Aggregates" 1.0 0 -16777216 true "" ";plotxy (ticks) n_blasto"
+"Solitaries" 1.0 0 -2674135 true "" ";plotxy (ticks)  n_oozoids"
 
 PLOT
 1030
 10
 1190
 295
-Mean Chla (scaled from 1 to 0)
+Max Chla
 NIL
 NIL
 0.0
@@ -1183,8 +1230,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot mean [chla] of patches / resolution"
-"pen-1" 1.0 0 -13840069 true "" "plot max [chla] of patches / resolution"
+"pen-1" 1.0 0 -13840069 true "" ";plot max [chla] of patches / resolution"
 
 PLOT
 540
@@ -1223,10 +1269,10 @@ PENS
 "default" 1.0 0 -16777216 true "" ""
 
 PLOT
-943
-906
-1140
-1044
+965
+905
+1162
+1043
 Age of Oozoids
 NIL
 NIL
@@ -1243,7 +1289,7 @@ PENS
 PLOT
 964
 754
-1153
+1164
 900
 Age of Blastozoids
 NIL
@@ -1325,7 +1371,7 @@ Salp_starvation
 Salp_starvation
 0
 1000
-27.0
+36.0
 1
 1
 d
@@ -1358,7 +1404,7 @@ Salp_mortality
 Salp_mortality
 0
 100
-2.56
+2.83
 0.1
 1
 % / d
@@ -1373,7 +1419,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-42.0
+51.0
 1
 1
 d
@@ -1385,7 +1431,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset halfsat 0.20\nset vegetation_delay 45\nset Salp_immiprob 0.85\nset Salp_amount 10\nset Salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset Salp_starvation 30\nset Salp_mortality 2.5\nset Krill_hibernation 20\nset Krill_amount 10\nset Krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset halfsat 0.20\nset vegetation_delay 45\nset Salp_immiprob 0.85\nset Salp_amount 10\nset Salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset Salp_starvation 30\nset Salp_mortality 2.5\nset Krill_hibernation 20\nset Krill_amount 30\nset Krill_mortality 0.07
 NIL
 1
 T
@@ -1477,7 +1523,7 @@ false
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot temp_factor"
+"default" 1.0 0 -16777216 true "" ";plot temp_factor"
 
 CHOOSER
 15
@@ -1516,7 +1562,7 @@ Salp_immiprob
 Salp_immiprob
 0
 100
-0.867
+0.63
 0.01
 1
 %
@@ -1531,7 +1577,7 @@ chla_growth
 chla_growth
 0
 1
-0.267
+0.316
 0.01
 1
 NIL
@@ -1546,7 +1592,7 @@ chla_decay
 chla_decay
 0
 1
-0.048
+0.051
 0.01
 1
 NIL
@@ -1572,7 +1618,7 @@ halfsat
 halfsat
 0
 1
-0.195
+0.173
 0.01
 1
 mg Chla / m³
@@ -1587,7 +1633,7 @@ Salp_amount
 Salp_amount
 0
 100
-11.0
+15.0
 1
 1
 n
@@ -1602,7 +1648,7 @@ Salp_length
 Salp_length
 0
 5
-3.0
+4.3
 0.1
 1
 cm
@@ -1635,7 +1681,7 @@ Krill_amount
 Krill_amount
 0
 2000
-10.0
+39.0
 1
 1
 n
@@ -1661,7 +1707,7 @@ Krill_hibernation
 Krill_hibernation
 0
 100
-20.7
+10.1
 0.1
 1
 %
@@ -1683,14 +1729,14 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count debkrill + sum [number] of clutches"
+"default" 1.0 0 -16777216 true "" ";plot count debkrill + sum [number] of clutches"
 
 PLOT
 1350
 300
 1550
 450
-Maximum krill life time spawn events 
+Maximum krill life time spawn events
 NIL
 NIL
 0.0
@@ -1701,7 +1747,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot maxspawn"
+"default" 1.0 0 -16777216 true "" ";plot maxspawn"
 
 SLIDER
 15
@@ -1712,7 +1758,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-3.45
+2.79
 0.1
 1
 % / d
@@ -1727,7 +1773,7 @@ blasto_resp
 blasto_resp
 0
 100
-3.059
+2.868
 0.1
 1
 % / d
@@ -1738,7 +1784,7 @@ PLOT
 10
 1750
 290
-Abundance adult krill
+Abundance adult Krill
 NIL
 NIL
 0.0
@@ -1749,29 +1795,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count debkrill"
-
-MONITOR
-1560
-400
-1635
-445
-NIL
-max_gen
-17
-1
-11
-
-MONITOR
-1640
-400
-1715
-445
-C°
-(cos ((ticks) / 365 * 360) * 2 + 273) - 273
-2
-1
-11
+"default" 1.0 0 -16777216 true "" ";plot count debkrill"
 
 TEXTBOX
 190
@@ -1923,7 +1947,7 @@ Krill_mortality
 Krill_mortality
 0
 100
-0.069
+0.098
 0.01
 1
 % / d
@@ -2000,10 +2024,10 @@ TEXTBOX
 1
 
 SWITCH
-410
-590
-513
-623
+395
+450
+498
+483
 SA?
 SA?
 0
@@ -2011,10 +2035,10 @@ SA?
 -1000
 
 MONITOR
-435
-435
-492
-480
+1560
+400
+1635
+445
 year
 floor (ticks / 365) + 1
 0
@@ -2022,15 +2046,26 @@ floor (ticks / 365) + 1
 11
 
 MONITOR
-435
-485
-510
-530
+1640
+400
+1720
+445
 NIL
 chlaK
 3
 1
 11
+
+SWITCH
+395
+490
+498
+523
+plots?
+plots?
+1
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -2407,7 +2442,7 @@ NetLogo 6.1.1
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="SA" repetitions="500" runMetricsEveryStep="false">
+  <experiment name="SA" repetitions="1000" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
     <metric>vegetation_delay</metric>
@@ -2424,6 +2459,11 @@ NetLogo 6.1.1
     <metric>Salp_starvation</metric>
     <metric>Krill_hibernation</metric>
     <metric>halfsat</metric>
+    <metric>maxn</metric>
+    <metric>medabund</metric>
+    <metric>maxabund</metric>
+    <metric>maxsize</metric>
+    <metric>maxspawn</metric>
   </experiment>
 </experiments>
 @#$#@#$#@
