@@ -771,33 +771,35 @@ to sexual_repro
     ]
   ]
 
-  ; for krill we follow the ideas of Jager et al. 2015 - clutch size is abitrary and
-  ; also the buffer that remains with the krill 35 is open for further manipulation
   ask krills [
     set WR (WR + JR)
-    ; the number 56 is following Jager et al. 2015 value for WB0 (dry weight of an egg) and a clutch size of 2000:
-    ; 2000 * 0.038 mg dry weight = 56; the used 35 is an ad hoc buffer against starvation
-    if (WR > 56 + 35) [                    ; if threshold is exceeded, eggs are produced
-      if n_spawn = 0 [
-        set d_first_reproduction age       ; store age of first reproduction event
-      ]
-      set n_spawn (n_spawn + 1)
-      set WR (WR - 56)                ; update reproduction buffer
-      hatch-clutches 1 [
-        set l (1.72 * 0.2)            ; this is already the length of C1 stage, but we assume that the first 30 days krill will not feed, the growth will be fed by the energy from the eggs
-        set WV (0.22 * (L) ^ 3)       ; structural body mass
-        set WB 0                      ; assimilate buffer in egg
-        set WR 0                      ; reproduction buffer
-        set JA 0
-        set JV 0
-        set JR 0
-        set JM 0
-        set n_spawn 0                     ; number of spawning events
-        set age 0                         ; age in days
-        set d_first_reproduction 0        ; age of first reproduction
-        setxy random-xcor random-ycor     ; random location
-        set number 2000                   ; number of eggs in clutch
-        set d_starvation 0                ; days without food
+    ; the threshold for production of eggs is calculated based on the individual length
+    let egg_threshold ((150.83 * L / 0.2 - 3027) * 0.028) ; equation from Bahlburg et al. (2021)
+    ; if WR exceeds egg threshold, length exceeds 35 mm and its a day of October to March
+    ; (which was taken from Bahlburg et al. (2021), eggs are produced
+    if (ticks mod 365 < 91) or (ticks mod 365 > 272 ) [
+      if (WR >= egg_threshold and L >= 7) [
+        if n_spawn = 0 [
+          set d_first_reproduction age       ; store age of first reproduction event
+        ]
+        set n_spawn (n_spawn + 1)
+        set WR (WR - egg_threshold)          ; update reproduction buffer
+        hatch-clutches 1 [
+          set l (1.72 * 0.2)                 ; this is already the length of C1 stage, but we assume that the first 30 days krill will not feed, the growth will be fed by the energy from the eggs
+          set WV (0.22 * (L) ^ 3)            ; structural body mass
+          set WB 0                           ; assimilate buffer in egg
+          set WR 0                           ; reproduction buffer
+          set JA 0
+          set JV 0
+          set JR 0
+          set JM 0
+          set n_spawn 0                      ; number of spawning events
+          set age 0                          ; age in days
+          set d_first_reproduction 0         ; age of first reproduction
+          setxy random-xcor random-ycor      ; random location
+          set number (egg_threshold / 0.028) ; number of eggs in clutch
+          set d_starvation 0                 ; days without food
+        ]
       ]
     ]
   ]
@@ -1369,7 +1371,7 @@ salp_starvation
 salp_starvation
 0
 1000
-30.0
+27.0
 1
 1
 d
@@ -1402,7 +1404,7 @@ salp_mortality
 salp_mortality
 0
 100
-2.27
+2.39
 0.1
 1
 % / d
@@ -1417,7 +1419,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-41.0
+66.0
 1
 1
 d
@@ -1560,7 +1562,7 @@ salp_immiprob
 salp_immiprob
 0
 100
-0.971
+0.827
 0.01
 1
 %
@@ -1575,7 +1577,7 @@ chla_growth
 chla_growth
 0
 1
-0.269
+0.27
 0.01
 1
 NIL
@@ -1590,7 +1592,7 @@ chla_decay
 chla_decay
 0
 1
-0.066
+0.031
 0.01
 1
 NIL
@@ -1616,7 +1618,7 @@ halfsat
 halfsat
 0
 1
-0.154
+0.187
 0.01
 1
 mg Chla / m³
@@ -1631,7 +1633,7 @@ salp_amount
 salp_amount
 0
 100
-7.0
+14.0
 1
 1
 n
@@ -1679,7 +1681,7 @@ krill_amount
 krill_amount
 0
 2000
-39.0
+28.0
 1
 1
 n
@@ -1692,7 +1694,7 @@ SWITCH
 156
 salps?
 salps?
-0
+1
 1
 -1000
 
@@ -1705,7 +1707,7 @@ krill_hibernation
 krill_hibernation
 0
 100
-23.6
+29.1
 0.1
 1
 %
@@ -1756,7 +1758,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-4.4
+4.13
 0.1
 1
 % / d
@@ -1771,7 +1773,7 @@ blasto_resp
 blasto_resp
 0
 100
-3.974
+2.295
 0.1
 1
 % / d
@@ -1945,7 +1947,7 @@ krill_mortality
 krill_mortality
 0
 100
-0.048
+0.074
 0.01
 1
 % / d
@@ -2061,9 +2063,31 @@ SWITCH
 523
 plots?
 plots?
-0
+1
 1
 -1000
+
+MONITOR
+425
+610
+527
+655
+first juveniles
+min [d_first_reproduction] of krills with [d_first_reproduction > 0]
+2
+1
+11
+
+MONITOR
+415
+540
+472
+585
+day
+ticks mod 365
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
