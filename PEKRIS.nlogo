@@ -39,6 +39,8 @@ globals [
   spawn_max                 ; maximum spawn events of single krill
   l_k_max                   ; maximum size (l) of single krill
   n_k_max                   ; maximum abundance of krill
+  n_k_eggs                  ; total amaount of eggs produced by krill
+  d_k_firstrepro            ; day of first krill reproduction
 ]
 
 oozoids-own [
@@ -781,6 +783,9 @@ to sexual_repro
       if (W_R >= egg_threshold and L >= 7) [
         if n_spawn = 0 [
           set d_first_reproduction d_age       ; store age of first reproduction event
+          if d_first_reproduction < d_k_firstrepro or d_k_firstrepro = 0 [
+            set d_k_firstrepro d_first_reproduction ; store day of first repro event if its the earliest
+          ]
         ]
         set n_spawn (n_spawn + 1)
         set W_R (W_R - egg_threshold)          ; update reproduction buffer
@@ -799,6 +804,7 @@ to sexual_repro
           setxy random-xcor random-ycor        ; random location
           set number (egg_threshold / 0.028)   ; number of eggs in clutch
           set d_starvation 0                   ; days without food
+          set n_k_eggs round (n_k_eggs + number)     ; update global egg counter
         ]
       ]
     ]
@@ -1371,7 +1377,7 @@ salp_starvation
 salp_starvation
 0
 1000
-16.0
+33.0
 1
 1
 d
@@ -1404,7 +1410,7 @@ salp_mortality
 salp_mortality
 0
 100
-3.57
+1.64
 0.1
 1
 % / d
@@ -1419,7 +1425,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-43.0
+64.0
 1
 1
 d
@@ -1562,7 +1568,7 @@ salp_immiprob
 salp_immiprob
 0
 100
-1.107
+1.113
 0.01
 1
 %
@@ -1577,7 +1583,7 @@ chla_growth
 chla_growth
 0
 1
-0.256
+0.297
 0.01
 1
 NIL
@@ -1592,7 +1598,7 @@ chla_decay
 chla_decay
 0
 1
-0.03
+0.039
 0.01
 1
 NIL
@@ -1605,7 +1611,7 @@ SWITCH
 202
 MeasureInc?
 MeasureInc?
-0
+1
 1
 -1000
 
@@ -1618,7 +1624,7 @@ halfsat
 halfsat
 0
 1
-0.173
+0.107
 0.01
 1
 mg Chla / m³
@@ -1633,7 +1639,7 @@ salp_amount
 salp_amount
 0
 100
-14.0
+13.0
 1
 1
 n
@@ -1648,7 +1654,7 @@ salp_length
 salp_length
 0
 5
-2.8
+1.8
 0.1
 1
 cm
@@ -1681,7 +1687,7 @@ krill_amount
 krill_amount
 0
 2000
-37.0
+45.0
 1
 1
 n
@@ -1707,7 +1713,7 @@ krill_hibernation
 krill_hibernation
 0
 100
-23.3
+18.2
 0.1
 1
 %
@@ -1758,7 +1764,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-3.03
+4.49
 0.1
 1
 % / d
@@ -1773,7 +1779,7 @@ blasto_resp
 blasto_resp
 0
 100
-3.612
+2.651
 0.1
 1
 % / d
@@ -1947,7 +1953,7 @@ krill_mortality
 krill_mortality
 0
 100
-0.06
+0.037
 0.01
 1
 % / d
@@ -2459,7 +2465,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.1.1
+NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -2482,10 +2488,10 @@ NetLogo 6.1.1
     <metric>krill_hibernation</metric>
     <metric>halfsat</metric>
     <metric>n_s_max</metric>
-    <metric>ab_s_med</metric>
-    <metric>maxabund</metric>
+    <metric>n_s_med</metric>
+    <metric>d_k_firstrepro</metric>
     <metric>l_k_max</metric>
-    <metric>spawn_max</metric>
+    <metric>n_k_eggs</metric>
   </experiment>
 </experiments>
 @#$#@#$#@
