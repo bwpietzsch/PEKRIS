@@ -39,7 +39,7 @@ globals [
   spawn_max                 ; maximum spawn events of single krill
   l_k_max                   ; maximum size (l) of single krill
   n_k_max                   ; maximum abundance of krill
-  n_k_eggs                  ; total amaount of eggs produced by krill
+  n_k_max_eggs              ; maximum amaount of eggs produced by one individual krill
   d_k_firstrepro            ; day of first krill reproduction
 ]
 
@@ -87,6 +87,7 @@ krills-own [                ; follows the notation of Jager et al. 2015
   J_V                       ; structural growth (mg dry weight per day)
   J_R                       ; investment reproduction buffer (mg dry weight per day)
   n_spawn                   ; number of spawning events
+  n_eggs                    ; number of eggs produced
   d_age                     ; age (days)
   d_first_reproduction      ; age of first reproduction (days)
   d_starvation              ; counts days where respiration cannot be fullfilled
@@ -131,7 +132,7 @@ to setup
 
     ; for each parameter, select a random value between min (SAmin) and max (min + SAspan)
     set chla_growth precision (SAmin * 0.25 + random-float (SAspan * 0.25)) 3           ; round to 3 digits
-    set chla_decay precision (SAmin * 0.05 + random-float (SAspan * 0.05)) 3            ; round to 3 digits
+    set chla_decay precision (SAmin * 0.05 + random-float (SAspan * 0.05)) 4            ; round to 4 digits
     set vegetation_delay (precision (SAmin * 45) 0 + random precision (SAspan * 45) 0)  ; round to 0 digits
     set salp_halfsat precision (SAmin * 0.20 + random-float (SAspan * 0.20)) 3          ; round to 3 digits
     set salp_immiprob (precision (SAmin * 0.85 + random-float (SAspan * 0.85)) 3)       ; round to 3 digits
@@ -141,7 +142,7 @@ to setup
     set salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)        ; round to 2 digits
     set oozoid_resp (precision (SAmin * 3.5 + random-float (SAspan * 3.5)) 2)           ; round to 2 digits
     set blasto_resp (precision (SAmin * 3.0 + random-float (SAspan * 3.0)) 3)           ; round to 3 digits
-    set krill_halfsat precision (SAmin * 0.33 + random-float (SAspan * 0.20)) 3         ; round to 3 digits
+    set krill_halfsat precision (SAmin * 0.106 + random-float (SAspan * 0.106)) 4       ; round to 4 digits
     set krill_amount (SAmin * 30 + random (SAspan * 30 + 1))                            ; no rounding
     set krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)     ; round to 3 digits
     set krill_hibernation (precision (SAmin * 20 + random-float (SAspan * 20)) 1)       ; round to 1 digit
@@ -298,7 +299,8 @@ to grow
 
   set T (cos ((ticks) / 365 * 360) * 2 + 273)         ; set temperature based on time of year
   set T_factor_s (exp (8000 / 275 - 8000 / T))        ; Arrhenius relation for salps taken from Groenefeld et al. (2020)
-  let T_factor_k (exp (7421 / 274.15 - 7421 / T))     ; Arrhenius relation for krill taken from Bahlburg et al. (2021)
+  ;let T_factor_k (exp (7421 / 275 - 7421 / T))     ; Arrhenius relation for krill taken from Bahlburg et al. (2021)
+  let T_factor_k (exp (8000 / 275 - 8000 / T))     ; Arrhenius relation for krill taken from Bahlburg et al. (2021)
   let dayt ticks mod 365                              ; day of the year - used for krill below
 
 
@@ -790,6 +792,10 @@ to sexual_repro
           ]
         ]
         set n_spawn (n_spawn + 1)
+        set n_eggs round (n_eggs + (egg_threshold / 0.028))
+        if n_eggs > n_k_max_eggs [
+          set n_k_max_eggs n_eggs
+        ]
         set W_R (W_R - egg_threshold)          ; update reproduction buffer
         hatch-clutches 1 [
           set l (1.72 * 0.2)                   ; this is already the length of C1 stage, but we assume that the first 30 days krill will not feed, the growth will be fed by the energy from the eggs
@@ -806,7 +812,6 @@ to sexual_repro
           setxy random-xcor random-ycor        ; random location
           set number (egg_threshold / 0.028)   ; number of eggs in clutch
           set d_starvation 0                   ; days without food
-          set n_k_eggs round (n_k_eggs + number)     ; update global egg counter
         ]
       ]
     ]
@@ -1379,7 +1384,7 @@ salp_starvation
 salp_starvation
 0
 1000
-15.0
+24.0
 1
 1
 d
@@ -1412,7 +1417,7 @@ salp_mortality
 salp_mortality
 0
 100
-1.47
+3.27
 0.1
 1
 % / d
@@ -1427,7 +1432,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-34.0
+58.0
 1
 1
 d
@@ -1439,7 +1444,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.33\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.106\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
 NIL
 1
 T
@@ -1570,7 +1575,7 @@ salp_immiprob
 salp_immiprob
 0
 100
-0.597
+1.135
 0.01
 1
 %
@@ -1585,7 +1590,7 @@ chla_growth
 chla_growth
 0
 1
-0.329
+0.173
 0.01
 1
 NIL
@@ -1600,7 +1605,7 @@ chla_decay
 chla_decay
 0
 1
-0.058
+0.0438
 0.01
 1
 NIL
@@ -1626,7 +1631,7 @@ salp_halfsat
 salp_halfsat
 0
 1
-0.281
+0.207
 0.01
 1
 mg Chla / m³
@@ -1641,7 +1646,7 @@ salp_amount
 salp_amount
 0
 100
-11.0
+6.0
 1
 1
 n
@@ -1656,7 +1661,7 @@ salp_length
 salp_length
 0
 5
-3.6
+1.8
 0.1
 1
 cm
@@ -1689,7 +1694,7 @@ krill_amount
 krill_amount
 0
 2000
-36.0
+30.0
 1
 1
 n
@@ -1715,7 +1720,7 @@ krill_hibernation
 krill_hibernation
 0
 100
-16.2
+24.8
 0.1
 1
 %
@@ -1766,7 +1771,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-4.93
+2.84
 0.1
 1
 % / d
@@ -1781,7 +1786,7 @@ blasto_resp
 blasto_resp
 0
 100
-2.891
+3.0
 0.1
 1
 % / d
@@ -1955,7 +1960,7 @@ krill_mortality
 krill_mortality
 0
 100
-0.092
+0.038
 0.01
 1
 % / d
@@ -2084,7 +2089,7 @@ krill_halfsat
 krill_halfsat
 0
 1
-0.23
+0.0867
 0.01
 1
 mg Chla / m³
@@ -2497,7 +2502,73 @@ NetLogo 6.2.0
     <metric>n_s_med</metric>
     <metric>d_k_firstrepro</metric>
     <metric>l_k_max</metric>
-    <metric>n_k_eggs</metric>
+    <metric>n_k_max_eggs</metric>
+  </experiment>
+  <experiment name="k-halfsat" repetitions="1000" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="2160"/>
+    <metric>krill_halfsat</metric>
+    <metric>l_k_max</metric>
+    <metric>n_k_max_eggs</metric>
+    <metric>d_k_firstrepro</metric>
+    <enumeratedValueSet variable="SA?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="vegetation_delay">
+      <value value="45"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="oozoid_resp">
+      <value value="3.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_immiprob">
+      <value value="0.85"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_growth">
+      <value value="0.25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_starvation">
+      <value value="30"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_amount">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_mortality">
+      <value value="2.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="krill_amount">
+      <value value="30"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="plots?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="krill_hibernation">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="blasto_resp">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salps?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_decay">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_length">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_halfsat">
+      <value value="0.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="MeasureInc?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_supply">
+      <value value="&quot;Const&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="krill_mortality">
+      <value value="0"/>
+    </enumeratedValueSet>
   </experiment>
 </experiments>
 @#$#@#$#@
