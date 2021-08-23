@@ -36,6 +36,8 @@ globals [
   t_immigration_max         ; this variable store the maximum immigration time during a season
   migrationevent?           ; true if a migration event happened during this season
   T                         ; daily temperature (Kelvin)
+  ;n_o_max_offspring
+  ;n_b_max_offspring
   spawn_max                 ; maximum spawn events of single krill
   l_k_max                   ; maximum size (l) of single krill
   n_k_max                   ; maximum abundance of krill
@@ -190,7 +192,7 @@ to setup
 
   ; creation of oozoids ----------------------------------------------------------------------------------------------------------------------------- ;
 
-  if salps? = true [
+  if species != "krill" [
 
     create-oozoids 2 [                             ; creates 2 oozoids
       set number 1                                 ; 1 individual
@@ -210,17 +212,19 @@ to setup
 
   ; creation of krill ------------------------------------------------------------------------------------------------------------------------------- ;
 
-  create-krills krill_amount [     ; create N_krill
-    set L 0.34                     ; structural length of 1.7 mm - C1 stage with 30 days of age (Ikeda 1984 J. Exp. Mar. Biol. Ecol.)
-    set W_V 0.22 * ( L) ^ 3        ; structural body mass
-    set W_B 0.0                    ; no assimilate buffer in egg so far
-    set W_R 0                      ; no reproduction buffer so far
-    set n_spawn 0                  ; no spawning events so far
-    set d_age 30                   ; age in days
-    set d_first_reproduction 0     ; no reproduction so far
-    setxy random-xcor random-ycor  ; random location
-    set d_starvation 0             ; no starvation so far
-    set color black                ; krill are displayed as black
+  if species != "salps" [            ; krill is produced only if chosen so
+    create-krills krill_amount [     ; create N_krill
+      set L 0.34                     ; structural length of 1.7 mm - C1 stage with 30 days of age (Ikeda 1984 J. Exp. Mar. Biol. Ecol.)
+      set W_V 0.22 * ( L) ^ 3        ; structural body mass
+      set W_B 0.0                    ; no assimilate buffer in egg so far
+      set W_R 0                      ; no reproduction buffer so far
+      set n_spawn 0                  ; no spawning events so far
+      set d_age 30                   ; age in days
+      set d_first_reproduction 0     ; no reproduction so far
+      setxy random-xcor random-ycor  ; random location
+      set d_starvation 0             ; no starvation so far
+      set color black                ; krill are displayed as black
+    ]
   ]
 
   reset-ticks                      ; update all plots and start the NetLogo clock
@@ -233,7 +237,8 @@ end
 
 to go
 
-  if (ticks >= 100000 or count krills <= 0 and sum [number] of clutches = 0) [stop]   ; simulation stops either after it has reached its time span or all krill have died
+
+  if (ticks >= 100000) [stop]                                 ; simulation stops after it has reached its time span
 
   if SA? and (ticks >= (6 * 365 - 30)) [stop]                 ; stop simulation during SA if one krill lifecycle finished (6 years minus 30 days)
 
@@ -251,7 +256,7 @@ to go
   sexual_repro                                         ; sexual reproduction of krill and salps (blastozoids)
   death                                                ; mortality
 
-  if salps? = true [                                   ; should salps be simulated?
+  if species != "krill" [                              ; should salps be simulated?
     immigration                                        ; immigration of salps into the simulation arena
   ]
 
@@ -1093,7 +1098,7 @@ to do_graphs
   histogram [d_age] of (turtle-set blastozoids chains)
 
   ; to reduce computational effort this is only computed once a year
-  if (ticks mod 365 = 50) and salps? [
+  if (ticks mod 365 = 50) and species != "krill" [
     if MeasureInc? [
 
       set-current-plot "Growth Rates Oozoids"
@@ -1384,7 +1389,7 @@ salp_starvation
 salp_starvation
 0
 1000
-24.0
+30.0
 1
 1
 d
@@ -1417,7 +1422,7 @@ salp_mortality
 salp_mortality
 0
 100
-3.27
+2.5
 0.1
 1
 % / d
@@ -1432,7 +1437,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-58.0
+45.0
 1
 1
 d
@@ -1575,7 +1580,7 @@ salp_immiprob
 salp_immiprob
 0
 100
-1.135
+0.85
 0.01
 1
 %
@@ -1590,7 +1595,7 @@ chla_growth
 chla_growth
 0
 1
-0.173
+0.25
 0.01
 1
 NIL
@@ -1605,7 +1610,7 @@ chla_decay
 chla_decay
 0
 1
-0.0438
+0.05
 0.01
 1
 NIL
@@ -1631,7 +1636,7 @@ salp_halfsat
 salp_halfsat
 0
 1
-0.207
+0.2
 0.01
 1
 mg Chla / m³
@@ -1646,7 +1651,7 @@ salp_amount
 salp_amount
 0
 100
-6.0
+10.0
 1
 1
 n
@@ -1661,7 +1666,7 @@ salp_length
 salp_length
 0
 5
-1.8
+3.0
 0.1
 1
 cm
@@ -1700,17 +1705,6 @@ krill_amount
 n
 HORIZONTAL
 
-SWITCH
-14
-123
-117
-156
-salps?
-salps?
-0
-1
--1000
-
 SLIDER
 15
 845
@@ -1720,7 +1714,7 @@ krill_hibernation
 krill_hibernation
 0
 100
-24.8
+20.0
 0.1
 1
 %
@@ -1771,7 +1765,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-2.84
+3.5
 0.1
 1
 % / d
@@ -1960,7 +1954,7 @@ krill_mortality
 krill_mortality
 0
 100
-0.038
+0.07
 0.01
 1
 % / d
@@ -2007,16 +2001,6 @@ constant or varying Chla (based on AMLR data)
 1
 
 TEXTBOX
-125
-120
-275
-150
-on: salps immigrate into the model world
-12
-0.0
-1
-
-TEXTBOX
 155
 170
 305
@@ -2043,7 +2027,7 @@ SWITCH
 483
 SA?
 SA?
-0
+1
 1
 -1000
 
@@ -2076,7 +2060,7 @@ SWITCH
 523
 plots?
 plots?
-1
+0
 1
 -1000
 
@@ -2089,7 +2073,7 @@ krill_halfsat
 krill_halfsat
 0
 1
-0.0867
+0.106
 0.01
 1
 mg Chla / m³
@@ -2101,6 +2085,26 @@ TEXTBOX
 415
 760
 half saturation krill (Atkinson et al. 2006)
+12
+0.0
+1
+
+CHOOSER
+15
+120
+115
+165
+species
+species
+"krill" "salps" "both"
+2
+
+TEXTBOX
+120
+115
+370
+161
+\"krill\" - only krill individuals, \"salps\" - only salp individuals, \"both\" - both species simultaneously
 12
 0.0
 1
@@ -2568,6 +2572,78 @@ NetLogo 6.2.0
     </enumeratedValueSet>
     <enumeratedValueSet variable="krill_mortality">
       <value value="0"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="population" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>n_s_max_total</metric>
+    <metric>n_s_med</metric>
+    <metric>d_k_firstrepro</metric>
+    <metric>l_k_max</metric>
+    <metric>n_k_max_eggs</metric>
+    <enumeratedValueSet variable="SA?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="vegetation_delay">
+      <value value="45"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="oozoid_resp">
+      <value value="3.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="species">
+      <value value="&quot;krill&quot;"/>
+      <value value="&quot;salps&quot;"/>
+      <value value="&quot;both&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_immiprob">
+      <value value="0.85"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_mortality">
+      <value value="2.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_starvation">
+      <value value="30"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_amount">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_growth">
+      <value value="0.25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="plots?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="krill_hibernation">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="krill_amount">
+      <value value="30"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="blasto_resp">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_decay">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_length">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="salp_halfsat">
+      <value value="0.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="MeasureInc?">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="krill_halfsat">
+      <value value="0.106"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_supply">
+      <value value="&quot;Const&quot;"/>
+      <value value="&quot;Lognorm&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="krill_mortality">
+      <value value="0.07"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>
