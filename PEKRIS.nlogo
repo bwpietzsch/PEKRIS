@@ -36,8 +36,6 @@ globals [
   t_immigration_max         ; this variable store the maximum immigration time during a season
   migrationevent?           ; true if a migration event happened during this season
   T                         ; daily temperature (Kelvin)
-  ;n_o_max_offspring
-  ;n_b_max_offspring
   spawn_max                 ; maximum spawn events of single krill
   l_k_max                   ; maximum size (l) of single krill
   n_k_max                   ; maximum abundance of krill
@@ -142,8 +140,8 @@ to setup
     set salp_length (precision (SAmin * 3 + random-float (SAspan * 3)) 1)               ; round to 1 digit
     set salp_starvation (SAmin * 30 + random (SAspan * 30 + 1))                         ; no rounding
     set salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)        ; round to 2 digits
-    set oozoid_resp (precision (SAmin * 3.5 + random-float (SAspan * 3.5)) 2)           ; round to 2 digits
-    set blasto_resp (precision (SAmin * 3.0 + random-float (SAspan * 3.0)) 3)           ; round to 3 digits
+    set oozoid_resp (precision (SAmin * 5.0 + random-float (SAspan * 3.5)) 2)           ; round to 2 digits
+    set blasto_resp (precision (SAmin * 15.0 + random-float (SAspan * 3.0)) 2)          ; round to 2 digits
     set krill_halfsat precision (SAmin * 0.106 + random-float (SAspan * 0.106)) 4       ; round to 4 digits
     set krill_amount (SAmin * 30 + random (SAspan * 30 + 1))                            ; no rounding
     set krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)     ; round to 3 digits
@@ -238,7 +236,8 @@ end
 to go
 
 
-  if (ticks >= 100000) [stop]                                 ; simulation stops after it has reached its time span
+  ;if (ticks >= 100000) [stop]                                 ; simulation stops after it has reached its time span
+  if (ticks >= (20 * 365 - 30)) [stop]                        ; simulation stops after it has reached its time span
 
   if SA? and (ticks >= (6 * 365 - 30)) [stop]                 ; stop simulation during SA if one krill lifecycle finished (6 years minus 30 days)
 
@@ -829,25 +828,26 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to death
-  ; salps die after 500 days or due to daily mortality or due to starvation (30 days)
+  ; salps die after half a year (Siegel 2017 mentiones a few month as maximum age)
+  ; or due to daily mortality or due to starvation (30 days)
 
   ask oozoids [
     set d_age (d_age + 1)
-    if (d_age > 500 or n_repro = 5) [die]
+    if (d_age > 182 or n_repro = 5) [die]
     if (d_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask blastozoids [
     set d_age (d_age + 1)
-    if (d_age > 500) [die]
+    if (d_age > 182) [die]
     if (d_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask chains [
     set d_age (d_age + 1)
-    if (d_age > 500) [die]
+    if (d_age > 182) [die]
     if (d_starvation > salp_starvation) [die]
     let counter 0
     if (number > 0) [
@@ -1389,7 +1389,7 @@ salp_starvation
 salp_starvation
 0
 1000
-30.0
+21.0
 1
 1
 d
@@ -1422,7 +1422,7 @@ salp_mortality
 salp_mortality
 0
 100
-2.5
+2.1
 0.1
 1
 % / d
@@ -1437,7 +1437,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-45.0
+47.0
 1
 1
 d
@@ -1449,7 +1449,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 3.5\nset blasto_resp 3.0\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.106\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 5.0\nset blasto_resp 15.0\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.106\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
 NIL
 1
 T
@@ -1580,7 +1580,7 @@ salp_immiprob
 salp_immiprob
 0
 100
-0.85
+0.969
 0.01
 1
 %
@@ -1595,7 +1595,7 @@ chla_growth
 chla_growth
 0
 1
-0.25
+0.318
 0.01
 1
 NIL
@@ -1610,7 +1610,7 @@ chla_decay
 chla_decay
 0
 1
-0.05
+0.0457
 0.01
 1
 NIL
@@ -1636,7 +1636,7 @@ salp_halfsat
 salp_halfsat
 0
 1
-0.2
+0.208
 0.01
 1
 mg Chla / m³
@@ -1651,7 +1651,7 @@ salp_amount
 salp_amount
 0
 100
-10.0
+14.0
 1
 1
 n
@@ -1666,7 +1666,7 @@ salp_length
 salp_length
 0
 5
-3.0
+2.6
 0.1
 1
 cm
@@ -1699,7 +1699,7 @@ krill_amount
 krill_amount
 0
 2000
-30.0
+20.0
 1
 1
 n
@@ -1714,7 +1714,7 @@ krill_hibernation
 krill_hibernation
 0
 100
-20.0
+13.0
 0.1
 1
 %
@@ -1765,7 +1765,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-3.5
+5.27
 0.1
 1
 % / d
@@ -1780,7 +1780,7 @@ blasto_resp
 blasto_resp
 0
 100
-3.0
+8.35
 0.1
 1
 % / d
@@ -1954,7 +1954,7 @@ krill_mortality
 krill_mortality
 0
 100
-0.07
+0.102
 0.01
 1
 % / d
@@ -2027,7 +2027,7 @@ SWITCH
 483
 SA?
 SA?
-1
+0
 1
 -1000
 
@@ -2060,7 +2060,7 @@ SWITCH
 523
 plots?
 plots?
-0
+1
 1
 -1000
 
@@ -2073,7 +2073,7 @@ krill_halfsat
 krill_halfsat
 0
 1
-0.106
+0.0641
 0.01
 1
 mg Chla / m³
@@ -2577,73 +2577,149 @@ NetLogo 6.2.0
   <experiment name="population" repetitions="100" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
+    <timeLimit steps="4380"/>
     <metric>n_s_max_total</metric>
     <metric>n_s_med</metric>
-    <metric>d_k_firstrepro</metric>
+    <metric>l_o_max</metric>
+    <metric>l_b_max</metric>
+    <metric>rep_cycles_max</metric>
+    <metric>n_k_max</metric>
     <metric>l_k_max</metric>
     <metric>n_k_max_eggs</metric>
-    <enumeratedValueSet variable="SA?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="oozoid_resp">
-      <value value="3.5"/>
-    </enumeratedValueSet>
+    <metric>d_k_firstrepro</metric>
+    <metric>spawn_max</metric>
     <enumeratedValueSet variable="species">
       <value value="&quot;krill&quot;"/>
       <value value="&quot;salps&quot;"/>
       <value value="&quot;both&quot;"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_immiprob">
-      <value value="0.85"/>
+    <enumeratedValueSet variable="chla_supply">
+      <value value="&quot;Const&quot;"/>
+      <value value="&quot;Lognorm&quot;"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_mortality">
-      <value value="2.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_amount">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_growth">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="plots?">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="krill_hibernation">
-      <value value="20"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="krill_amount">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="blasto_resp">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_decay">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_length">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="krill_halfsat">
-      <value value="0.106"/>
+  </experiment>
+  <experiment name="population2" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="2160"/>
+    <metric>n_s_max_total</metric>
+    <metric>n_s_med</metric>
+    <metric>l_o_max</metric>
+    <metric>l_b_max</metric>
+    <metric>rep_cycles_max</metric>
+    <metric>n_k_max</metric>
+    <metric>l_k_max</metric>
+    <metric>n_k_max_eggs</metric>
+    <metric>d_k_firstrepro</metric>
+    <metric>spawn_max</metric>
+    <enumeratedValueSet variable="species">
+      <value value="&quot;krill&quot;"/>
+      <value value="&quot;salps&quot;"/>
+      <value value="&quot;both&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="chla_supply">
       <value value="&quot;Const&quot;"/>
       <value value="&quot;Lognorm&quot;"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="krill_mortality">
-      <value value="0.07"/>
+  </experiment>
+  <experiment name="ranges" repetitions="100" sequentialRunOrder="false" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>chla_growth</metric>
+    <metric>chla_decay</metric>
+    <metric>vegetation_delay</metric>
+    <metric>salp_halfsat</metric>
+    <metric>salp_immiprob</metric>
+    <metric>salp_amount</metric>
+    <metric>salp_length</metric>
+    <metric>salp_starvation</metric>
+    <metric>salp_mortality</metric>
+    <metric>oozoid_resp</metric>
+    <metric>blasto_resp</metric>
+    <metric>krill_halfsat</metric>
+    <metric>krill_amount</metric>
+    <metric>krill_mortality</metric>
+    <metric>krill_hibernation</metric>
+    <metric>min [L] of krills</metric>
+    <metric>max [L] of krills</metric>
+    <metric>min [W_R] of krills</metric>
+    <metric>max [W_R] of krills</metric>
+    <metric>min [J_A] of krills</metric>
+    <metric>max [J_A] of krills</metric>
+    <metric>min [J_M] of krills</metric>
+    <metric>max [J_M] of krills</metric>
+    <metric>min [J_V] of krills</metric>
+    <metric>max [J_V] of krills</metric>
+    <metric>min [J_R] of krills</metric>
+    <metric>max [J_R] of krills</metric>
+    <metric>max [d_age] of krills</metric>
+    <metric>min [W_V] of krills</metric>
+    <metric>max [W_V] of krills</metric>
+    <metric>max [n_spawn] of krills</metric>
+    <metric>max[d_starvation] of krills</metric>
+    <metric>max[d_first_reproduction] of krills</metric>
+    <metric>min [W_B] of krills</metric>
+    <metric>max[W_B] of krills</metric>
+    <metric>min [L] of clutches</metric>
+    <metric>max [L] of clutches</metric>
+    <metric>min [W_R] of clutches</metric>
+    <metric>max [W_R] of clutches</metric>
+    <metric>min [J_A] of clutches</metric>
+    <metric>max [J_A] of clutches</metric>
+    <metric>min [J_M] of clutches</metric>
+    <metric>max [J_M] of clutches</metric>
+    <metric>min [J_V] of clutches</metric>
+    <metric>max [J_V] of clutches</metric>
+    <metric>min [J_R] of clutches</metric>
+    <metric>max [J_R] of clutches</metric>
+    <metric>max [d_age] of clutches</metric>
+    <metric>min [W_V] of clutches</metric>
+    <metric>max [W_V] of clutches</metric>
+    <metric>min [number] of clutches</metric>
+    <metric>max [number] of clutches</metric>
+    <metric>max[d_starvation] of clutches</metric>
+    <metric>max[d_first_reproduction] of clutches</metric>
+    <metric>min [W_B] of clutches</metric>
+    <metric>max[W_B] of clutches</metric>
+    <metric>min [l] of oozoids</metric>
+    <metric>max [l] of oozoids</metric>
+    <metric>max [d_age] of oozoids</metric>
+    <metric>max [n_repro] of oozoids</metric>
+    <metric>max [generation] of oozoids</metric>
+    <metric>min [t_regeneration] of oozoids</metric>
+    <metric>max [t_regeneration] of oozoids</metric>
+    <metric>min [c_weight] of oozoids</metric>
+    <metric>max [c_weight] of oozoids</metric>
+    <metric>min [c_reproduction] of oozoids</metric>
+    <metric>max [c_reproduction] of oozoids</metric>
+    <metric>max[d_starvation] of oozoids</metric>
+    <metric>min [l] of blastozoids</metric>
+    <metric>max [l] of blastozoids</metric>
+    <metric>max [d_age] of blastozoids</metric>
+    <metric>max [generation] of blastozoids</metric>
+    <metric>min [c_weight] of blastozoids</metric>
+    <metric>max [c_weight] of blastozoids</metric>
+    <metric>min [c_reproduction] of blastozoids</metric>
+    <metric>max [c_reproduction] of blastozoids</metric>
+    <metric>max[d_starvation] of blastozoids</metric>
+    <metric>min [l] of chains</metric>
+    <metric>max [l] of chains</metric>
+    <metric>max [d_age] of chains</metric>
+    <metric>max [generation] of chains</metric>
+    <metric>min [c_weight] of chains</metric>
+    <metric>max [c_weight] of chains</metric>
+    <metric>min [c_reproduction] of chains</metric>
+    <metric>max [c_reproduction] of chains</metric>
+    <metric>max[d_starvation] of chains</metric>
+    <metric>min [number] of chains</metric>
+    <metric>max [number] of chains</metric>
+    <metric>min [chla] of patches</metric>
+    <metric>max [chla] of patches</metric>
+    <enumeratedValueSet variable="SA?">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="species">
+      <value value="&quot;both&quot;"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>
