@@ -140,8 +140,8 @@ to setup
     set salp_length (precision (SAmin * 3 + random-float (SAspan * 3)) 1)               ; round to 1 digit
     set salp_starvation (SAmin * 30 + random (SAspan * 30 + 1))                         ; no rounding
     set salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)        ; round to 2 digits
-    set oozoid_resp (precision (SAmin * 5.0 + random-float (SAspan * 3.5)) 2)           ; round to 2 digits
-    set blasto_resp (precision (SAmin * 15.0 + random-float (SAspan * 3.0)) 2)          ; round to 2 digits
+    set oozoid_resp (precision (SAmin * 5.0 + random-float (SAspan * 5.0)) 2)           ; round to 2 digits
+    set blasto_resp (precision (SAmin * 15.0 + random-float (SAspan * 15.0)) 2)         ; round to 2 digits
     set krill_halfsat precision (SAmin * 0.106 + random-float (SAspan * 0.106)) 4       ; round to 4 digits
     set krill_amount (SAmin * 30 + random (SAspan * 30 + 1))                            ; no rounding
     set krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)     ; round to 3 digits
