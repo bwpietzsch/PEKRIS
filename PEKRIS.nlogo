@@ -36,10 +36,13 @@ globals [
   t_immigration_max         ; this variable store the maximum immigration time during a season
   migrationevent?           ; true if a migration event happened during this season
   T                         ; daily temperature (Kelvin)
-  spawn_max                 ; maximum spawn events of single krill
-  l_k_max                   ; maximum size (l) of single krill
+  n_k_max_spawn             ; maximum spawn events of single krill
+  l_k_max                   ; maximum size (l) of krill
+  l_k_mean                  ; mean size (l) of krill
+  l_k_med                   ; median size (l) of krill
   n_k_max                   ; maximum abundance of krill
-  n_k_max_eggs              ; maximum amaount of eggs produced by one individual krill
+  n_k_max_adult             ; maximum abundance of adult krill
+  n_k_max_eggs              ; maximum amount of eggs produced by one individual krill
   d_k_firstrepro            ; day of first krill reproduction
 ]
 
@@ -1006,13 +1009,22 @@ to calc_globals
 
   if (count krills > 0) [
     ; calculate max spawning events
-    set spawn_max max (list spawn_max (max [n_spawn] of krills))
+    set n_k_max_spawn max (list n_k_max_spawn (max [n_spawn] of krills))
 
     ; calculate max abundance
     set n_k_max max (list n_k_max (precision (count krills + sum [number] of clutches) 0))
 
+    ; calculate max abundance of adult krill
+    set n_k_max_adult max (list n_k_max_adult (count krills with [l > 35 * 0.2]))
+
     ; calc max size
-    set l_k_max max (list l_k_max (precision (max [l] of krills) 2))
+    set l_k_max (precision (max [l] of krills) 2)
+
+    ; calc mean size
+    set l_k_mean (precision (mean [l] of krills) 2)
+
+    ; calc median size
+    set l_k_med (precision (median [l] of krills) 2)
   ]
 
   ; end of july, at the end of the Southern winter when abundances should be really low
@@ -1059,7 +1071,7 @@ to do_graphs
 
   set-current-plot "Maximum krill life time spawn events"
   set-current-plot-pen "default"
-  plotxy (ticks) spawn_max
+  plotxy (ticks) n_k_max_spawn
 
   set-current-plot "Krill abundance"
   set-current-plot-pen "default"
@@ -1389,7 +1401,7 @@ salp_starvation
 salp_starvation
 0
 1000
-21.0
+30.0
 1
 1
 d
@@ -1422,7 +1434,7 @@ salp_mortality
 salp_mortality
 0
 100
-2.1
+2.5
 0.1
 1
 % / d
@@ -1437,7 +1449,7 @@ vegetation_delay
 vegetation_delay
 0
 180
-47.0
+45.0
 1
 1
 d
@@ -1580,7 +1592,7 @@ salp_immiprob
 salp_immiprob
 0
 100
-0.969
+0.85
 0.01
 1
 %
@@ -1595,7 +1607,7 @@ chla_growth
 chla_growth
 0
 1
-0.318
+0.25
 0.01
 1
 NIL
@@ -1610,7 +1622,7 @@ chla_decay
 chla_decay
 0
 1
-0.0457
+0.05
 0.01
 1
 NIL
@@ -1636,7 +1648,7 @@ salp_halfsat
 salp_halfsat
 0
 1
-0.208
+0.2
 0.01
 1
 mg Chla / m³
@@ -1651,7 +1663,7 @@ salp_amount
 salp_amount
 0
 100
-14.0
+10.0
 1
 1
 n
@@ -1666,7 +1678,7 @@ salp_length
 salp_length
 0
 5
-2.6
+3.0
 0.1
 1
 cm
@@ -1699,7 +1711,7 @@ krill_amount
 krill_amount
 0
 2000
-20.0
+30.0
 1
 1
 n
@@ -1714,7 +1726,7 @@ krill_hibernation
 krill_hibernation
 0
 100
-13.0
+20.0
 0.1
 1
 %
@@ -1765,7 +1777,7 @@ oozoid_resp
 oozoid_resp
 0
 100
-5.27
+5.0
 0.1
 1
 % / d
@@ -1780,7 +1792,7 @@ blasto_resp
 blasto_resp
 0
 100
-8.35
+15.0
 0.1
 1
 % / d
@@ -1954,7 +1966,7 @@ krill_mortality
 krill_mortality
 0
 100
-0.102
+0.07
 0.01
 1
 % / d
@@ -2027,7 +2039,7 @@ SWITCH
 483
 SA?
 SA?
-0
+1
 1
 -1000
 
@@ -2073,7 +2085,7 @@ krill_halfsat
 krill_halfsat
 0
 1
-0.0641
+0.106
 0.01
 1
 mg Chla / m³
@@ -2577,41 +2589,20 @@ NetLogo 6.2.0
   <experiment name="population" repetitions="100" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
-    <timeLimit steps="4380"/>
+    <timeLimit steps="7300"/>
     <metric>n_s_max_total</metric>
     <metric>n_s_med</metric>
     <metric>l_o_max</metric>
     <metric>l_b_max</metric>
     <metric>rep_cycles_max</metric>
     <metric>n_k_max</metric>
+    <metric>n_k_max_adult</metric>
     <metric>l_k_max</metric>
+    <metric>l_k_mean</metric>
+    <metric>l_k_med</metric>
     <metric>n_k_max_eggs</metric>
     <metric>d_k_firstrepro</metric>
-    <metric>spawn_max</metric>
-    <enumeratedValueSet variable="species">
-      <value value="&quot;krill&quot;"/>
-      <value value="&quot;salps&quot;"/>
-      <value value="&quot;both&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="population2" repetitions="100" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2160"/>
-    <metric>n_s_max_total</metric>
-    <metric>n_s_med</metric>
-    <metric>l_o_max</metric>
-    <metric>l_b_max</metric>
-    <metric>rep_cycles_max</metric>
-    <metric>n_k_max</metric>
-    <metric>l_k_max</metric>
-    <metric>n_k_max_eggs</metric>
-    <metric>d_k_firstrepro</metric>
-    <metric>spawn_max</metric>
+    <metric>n_k_max_spawn</metric>
     <enumeratedValueSet variable="species">
       <value value="&quot;krill&quot;"/>
       <value value="&quot;salps&quot;"/>
