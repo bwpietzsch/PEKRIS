@@ -144,12 +144,14 @@ to setup
     set salp_starvation (SAmin * 30 + random (SAspan * 30 + 1))                         ; no rounding
     set salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)        ; round to 2 digits
     set oozoid_resp (precision (SAmin * 5.0 + random-float (SAspan * 5.0)) 2)           ; round to 2 digits
-    set blasto_resp (precision (SAmin * 15.0 + random-float (SAspan * 15.0)) 2)         ; round to 2 digits
+    set blasto_resp (precision (SAmin * 8.3 + random-float (SAspan * 8.3)) 2)         ; round to 2 digits
     set krill_halfsat precision (SAmin * 0.106 + random-float (SAspan * 0.106)) 4       ; round to 4 digits
     set krill_amount (SAmin * 30 + random (SAspan * 30 + 1))                            ; no rounding
     set krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)     ; round to 3 digits
     set krill_hibernation (precision (SAmin * 20 + random-float (SAspan * 20)) 1)       ; round to 1 digit
   ]
+
+  ;set blasto_resp (precision (1 + random-float (19)) 2)         ; round to 2 digits
 
   set monthlycount [0 0 0 0 0 0 0 0 0 0 0 0] ; here the intraannual distribution of salp abundances will be stored
 
@@ -836,21 +838,21 @@ to death
 
   ask oozoids [
     set d_age (d_age + 1)
-    if (d_age > 182 or n_repro = 5) [die]
+    if (d_age > 183 or n_repro = 5) [die]
     if (d_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask blastozoids [
     set d_age (d_age + 1)
-    if (d_age > 182) [die]
+    if (d_age > 365) [die]
     if (d_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask chains [
     set d_age (d_age + 1)
-    if (d_age > 182) [die]
+    if (d_age > 186) [die]
     if (d_starvation > salp_starvation) [die]
     let counter 0
     if (number > 0) [
@@ -1461,7 +1463,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 5.0\nset blasto_resp 15.0\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.106\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 5.0\nset blasto_resp 8.3\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.106\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
 NIL
 1
 T
@@ -1563,7 +1565,7 @@ CHOOSER
 chla_supply
 chla_supply
 "Const" "Lognorm"
-0
+1
 
 PLOT
 1086
@@ -1792,7 +1794,7 @@ blasto_resp
 blasto_resp
 0
 100
-15.0
+8.3
 0.1
 1
 % / d
@@ -2120,6 +2122,17 @@ TEXTBOX
 12
 0.0
 1
+
+MONITOR
+500
+580
+652
+625
+max l blasto
+max [l] of blastozoids
+2
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -2586,28 +2599,15 @@ NetLogo 6.2.0
       <value value="0"/>
     </enumeratedValueSet>
   </experiment>
-  <experiment name="population" repetitions="100" runMetricsEveryStep="false">
+  <experiment name="blasto-resp" repetitions="100" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
-    <timeLimit steps="7300"/>
-    <metric>n_s_max_total</metric>
-    <metric>n_s_med</metric>
-    <metric>l_o_max</metric>
-    <metric>l_b_max</metric>
-    <metric>rep_cycles_max</metric>
-    <metric>n_k_max</metric>
-    <metric>n_k_max_adult</metric>
-    <metric>l_k_max</metric>
-    <metric>l_k_mean</metric>
-    <metric>l_k_med</metric>
-    <metric>n_k_max_eggs</metric>
-    <metric>d_k_firstrepro</metric>
-    <metric>n_k_max_spawn</metric>
-    <enumeratedValueSet variable="species">
-      <value value="&quot;krill&quot;"/>
-      <value value="&quot;salps&quot;"/>
-      <value value="&quot;both&quot;"/>
-    </enumeratedValueSet>
+    <timeLimit steps="2160"/>
+    <metric>blasto_resp</metric>
+    <metric>max [l] of blastozoids</metric>
+    <metric>min [l] of blastozoids</metric>
+    <metric>reg_cycles</metric>
+    <metric>reg_cycles_max</metric>
     <enumeratedValueSet variable="chla_supply">
       <value value="&quot;Const&quot;"/>
       <value value="&quot;Lognorm&quot;"/>
@@ -2616,6 +2616,7 @@ NetLogo 6.2.0
   <experiment name="ranges" repetitions="100" sequentialRunOrder="false" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
+    <timeLimit steps="2160"/>
     <metric>chla_growth</metric>
     <metric>chla_decay</metric>
     <metric>vegetation_delay</metric>
@@ -2706,11 +2707,39 @@ NetLogo 6.2.0
     <metric>max [number] of chains</metric>
     <metric>min [chla] of patches</metric>
     <metric>max [chla] of patches</metric>
-    <enumeratedValueSet variable="SA?">
-      <value value="true"/>
-    </enumeratedValueSet>
     <enumeratedValueSet variable="species">
       <value value="&quot;both&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_supply">
+      <value value="&quot;Const&quot;"/>
+      <value value="&quot;Lognorm&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="population" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="7300"/>
+    <metric>n_s_max_total</metric>
+    <metric>n_s_med</metric>
+    <metric>l_o_max</metric>
+    <metric>l_b_max</metric>
+    <metric>rep_cycles_max</metric>
+    <metric>n_k_max</metric>
+    <metric>n_k_max_adult</metric>
+    <metric>l_k_max</metric>
+    <metric>l_k_mean</metric>
+    <metric>l_k_med</metric>
+    <metric>n_k_max_eggs</metric>
+    <metric>d_k_firstrepro</metric>
+    <metric>n_k_max_spawn</metric>
+    <enumeratedValueSet variable="species">
+      <value value="&quot;krill&quot;"/>
+      <value value="&quot;salps&quot;"/>
+      <value value="&quot;both&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_supply">
+      <value value="&quot;Const&quot;"/>
+      <value value="&quot;Lognorm&quot;"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>
