@@ -37,12 +37,11 @@ globals [
   migrationevent?           ; true if a migration event happened during this season
   T                         ; daily temperature (Kelvin)
   n_k_max_spawn             ; maximum spawn events of single krill
-  l_k_max                   ; maximum size (l) of krill
   l_k_mean                  ; mean size (l) of krill
   l_k_med                   ; median size (l) of krill
   n_k_max                   ; maximum abundance of krill
-  n_k_max_adult             ; maximum abundance of adult krill
   n_k_max_eggs              ; maximum amount of eggs produced by one individual krill
+  n_k_eggs_total            ; total amount of eggs produced by all krill during simulation experiment
   d_k_firstrepro            ; day of first krill reproduction
 ]
 
@@ -803,8 +802,9 @@ to sexual_repro
         set n_spawn (n_spawn + 1)
         set n_eggs round (n_eggs + (egg_threshold / 0.028))
         if n_eggs > n_k_max_eggs [
-          set n_k_max_eggs n_eggs
+          set n_k_max_eggs n_eggs              ; update maximum egg amount per individual krill
         ]
+        set n_k_eggs_total (n_k_eggs_total + n_eggs) ; add egg number to total amount of eggs
         set W_R (W_R - egg_threshold)          ; update reproduction buffer
         hatch-clutches 1 [
           set l (1.72 * 0.2)                   ; this is already the length of C1 stage, but we assume that the first 30 days krill will not feed, the growth will be fed by the energy from the eggs
@@ -1016,16 +1016,10 @@ to calc_globals
     ; calculate max abundance
     set n_k_max max (list n_k_max (precision (count krills + sum [number] of clutches) 0))
 
-    ; calculate max abundance of adult krill
-    set n_k_max_adult max (list n_k_max_adult (count krills with [l > 35 * 0.2]))
-
-    ; calc max size
-    set l_k_max (precision (max [l] of krills) 2)
-
     ; calc mean size
     set l_k_mean (precision (mean [l] of krills) 2)
 
-    ; calc median size
+    ;calc median size
     set l_k_med (precision (median [l] of krills) 2)
   ]
 
@@ -2123,17 +2117,6 @@ TEXTBOX
 0.0
 1
 
-MONITOR
-500
-580
-652
-625
-max l blasto
-max [l] of blastozoids
-2
-1
-11
-
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -2723,15 +2706,11 @@ NetLogo 6.2.0
     <metric>n_s_med</metric>
     <metric>l_o_max</metric>
     <metric>l_b_max</metric>
-    <metric>rep_cycles_max</metric>
     <metric>n_k_max</metric>
-    <metric>n_k_max_adult</metric>
-    <metric>l_k_max</metric>
     <metric>l_k_mean</metric>
     <metric>l_k_med</metric>
-    <metric>n_k_max_eggs</metric>
+    <metric>n_k_eggs_total</metric>
     <metric>d_k_firstrepro</metric>
-    <metric>n_k_max_spawn</metric>
     <enumeratedValueSet variable="species">
       <value value="&quot;krill&quot;"/>
       <value value="&quot;salps&quot;"/>
