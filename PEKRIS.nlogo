@@ -34,8 +34,12 @@ globals [
   t_regeneration_list       ; this measures the time between first chain release and last
   t_immigration_max         ; this variable store the maximum immigration time during a season
   migrationevent?           ; true if a migration event happened during this season
+  dayt                      ; day number of year
   T                         ; daily temperature (Kelvin)
+  T_factor_k                ; Arrhenius relation for krill (Bahlburg et al. 2021)
+  T_factor_s                ; Arrhenius relation for salp (Groenefeld et al. 2020)
   n_k_max_spawn             ; maximum spawn events of single krill
+  l_k_max                   ; maximum size (l) of krill
   l_k_mean                  ; mean size (l) of krill
   n_k_now                   ; current abundance of krill
   n_k_max_eggs              ; maximum amount of eggs produced by one individual krill
@@ -79,7 +83,6 @@ chains-own [
 
 krills-own [                ; follows the notation of Jager et al. 2015
   W_V                       ; structural body mass (mg dry weight)
-  W_B                       ; assimilate buffer in egg (mg dry weight)
   W_R                       ; build-up of reproduction buffer (mg dry weight)
   L                         ; structural body length (mm), divide by 0.2 to get real length
   J_A                       ; assimilation (mg dry weight per day)
@@ -97,7 +100,6 @@ clutches-own [
   ; reproduction will be computational problematic. This is why I model that as clutches
   ; this needs to be changed if direct interaction between krill and salps will be modelled
   W_V                       ; structural body mass (mg dry weight)
-  W_B                       ; assimilate buffer in egg (mg dry weight)
   W_R                       ; build-up of reproduction buffer (mg dry weight)
   L                         ; structural body length (mm)
   J_A                       ; assimilation (mg dry weight per day)
@@ -140,15 +142,22 @@ to setup
     set salp_length (precision (SAmin * 3 + random-float (SAspan * 3)) 1)               ; round to 1 digit
     set salp_starvation (SAmin * 30 + random (SAspan * 30 + 1))                         ; no rounding
     set salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)        ; round to 2 digits
-    set oozoid_resp (precision (SAmin * 5.0 + random-float (SAspan * 5.0)) 2)           ; round to 2 digits
-    set blasto_resp (precision (SAmin * 8.3 + random-float (SAspan * 8.3)) 2)         ; round to 2 digits
-    set krill_halfsat precision (SAmin * 0.106 + random-float (SAspan * 0.106)) 4       ; round to 4 digits
+    set oozoid_resp (precision (SAmin * 3.7 + random-float (SAspan * 3.7)) 2)           ; round to 2 digits
+    set blasto_resp (precision (SAmin * 7.5 + random-float (SAspan * 7.5)) 2)           ; round to 2 digits
+    set krill_halfsat precision (SAmin * 0.09 + random-float (SAspan * 0.09)) 3         ; round to 3 digits
     set krill_amount (SAmin * 30 + random (SAspan * 30 + 1))                            ; no rounding
     set krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)     ; round to 3 digits
     set krill_hibernation (precision (SAmin * 20 + random-float (SAspan * 20)) 1)       ; round to 1 digit
   ]
 
-  ;set blasto_resp (precision (1 + random-float (19)) 2)         ; round to 2 digits
+  ; only during calibration of krill_halfsat
+  ;set krill_halfsat (precision (random-float 1) 3)               ; round to 3 digits
+
+  ; only during calibration of blasto_resp
+  ;set blasto_resp (precision (1 + random-float (19)) 3)         ; round to 3 digits
+
+  ; only during calibration of blasto_resp
+  ;set oozoid_resp (precision (1 + random-float (19)) 3)         ; round to 3 digits
 
   set monthlycount [0 0 0 0 0 0 0 0 0 0 0 0] ; here the intraannual distribution of salp abundances will be stored
 
@@ -216,7 +225,6 @@ to setup
     create-krills krill_amount [     ; create N_krill
       set L 0.34                     ; structural length of 1.7 mm - C1 stage with 30 days of age (Ikeda 1984 J. Exp. Mar. Biol. Ecol.)
       set W_V 0.22 * ( L) ^ 3        ; structural body mass
-      set W_B 0.0                    ; no assimilate buffer in egg so far
       set W_R 0                      ; no reproduction buffer so far
       set n_spawn 0                  ; no spawning events so far
       set d_age 30                   ; age in days
@@ -237,8 +245,10 @@ end
 
 to go
 
-
-  if SA? and (ticks >= (6 * 365 - 30)) [stop]          ; stop simulation during SA if one krill lifecycle finished (6 years minus 30 days)
+  set T (cos ((ticks) / 365 * 360) * 2 + 273)          ; set temperature based on time of year
+  set T_factor_s (exp (8000 / 275 - 8000 / T))         ; Arrhenius relation for salps taken from Groenefeld et al. (2020)
+  set T_factor_k (exp (7421 / 275 - 7421 / T))         ; Arrhenius relation for krill taken from Bahlburg et al. (2021)
+  set dayt (ticks mod 365)                             ; day of the year - used for krill hibernation
 
   grow                                                 ; determine growth in body length
   asexual_repro                                        ; asexual reproduction of salps (oozoids)
@@ -252,9 +262,7 @@ to go
   update-patches                                       ; patches will be updated (e.g. chla content, density dependent krill survival)
   move                                                 ; random walk of krill and salps
   calc_globals                                         ; calculate globals and results
-  if plots? [
-    do_graphs                                          ; update plots
-  ]
+  do_graphs                                            ; update plots
 
   tick                                                 ; advance time step by one
 
@@ -265,14 +273,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to grow
-
-  ; in the grow procedure the change in body length will be calculated for all animals, this is done for each patch checking whether there is enough food available or not
-
-
-  set T (cos ((ticks) / 365 * 360) * 2 + 273)         ; set temperature based on time of year
-  let T_factor_s (exp (8000 / 275 - 8000 / T))        ; Arrhenius relation for salps taken from Groenefeld et al. (2020)
-  let T_factor_k (exp (7421 / 275 - 7421 / T))        ; Arrhenius relation for krill taken from Bahlburg et al. (2021)
-  let dayt ticks mod 365                              ; day of the year - used for krill hibernation below
 
   ; the following procedures are conducted per patch - assuming this is the local area where individuals compete for ressources ------------------
   ask patches [
@@ -333,7 +333,8 @@ to grow
       set chla (chla - T_factor_s * number * (0.0025 * fr_s * l ^ 2))         ; reduction of the overall available chla in the patch
       let c_respiration (T_factor_s * oozoid_resp / 100 * c_weight)         ; respiration costs based on carbon weight (Iguchi 2004)
       ifelse (c_respiration > c_growth) [                                   ; if respiration is higher than carbon allocated to growth
-        ifelse c_respiration < (c_growth + c_repro_local) [                 ; if respiration can be covered by assimilated carbon
+        ; if respiration can be covered by assimilated carbon
+        ifelse c_respiration < (c_growth + c_repro_local) [
           set c_repro_local (c_repro_local + c_growth - c_respiration)
           set c_growth 0
         ][; if respiration can be covered by assimilated carbon and the reproduction storage
@@ -480,21 +481,17 @@ end
 to determine_fluxes [frac]
   ; fluxes determined following Jager & Ravagnan (2015)
 
-  let dayt (ticks mod 365) ; get day of year based on ticks
-
-  let T_factor_k (exp (7421 / 274.15 - 7421 / T)) ; Arrhenius relation from Bahlburg et al. (2021)
-
   ; adult krill may have a reduced metabolic activity during winter
   ; length for adults from Jager & Ravagnan (2015)
   ifelse (dayt > 90 and dayt < 270 and l > 35 * 0.2) [
 
     ; assimilation
     let J_a_Am (krill_hibernation / 100 * 0.044)   ; maximum area-specific assimilation rate (Jager & Ravagnan 2015)
-    set J_A frac * J_a_Am * L ^ 2 * T_factor_k     ; mass flux for assimilation
+    set J_A (frac * J_a_Am * L ^ 2 * T_factor_k)   ; mass flux for assimilation
 
     ; respiration
     let J_VM (krill_hibernation / 100 * 0.0032)   ; volume-specific maintenance cost (Jager & Ravagnan 2015)
-    set J_M J_VM * L ^ 3 * T_factor_k             ; mass flux for maintenance
+    set J_M (J_VM * L ^ 3 * T_factor_k)           ; mass flux for maintenance
 
     ; growth
     let Y_VA 0.8                             ; yield of assimilates on structure (Jager & Ravagnan 2015)
@@ -567,9 +564,6 @@ to determine_fluxes_larvae [frac]
   ; but how are the fluxes different for small krill (larvae and juvenile) from the one of adult krill
   ; here following Jager et al. 2015 - there is only the growth part stored.
   ; the flux into reproduction J_R is burned
-
-  let dayt (ticks mod 365)                             ; get day of year from tick number
-  let T_factor_k (exp (7421 / 274.15 - 7421 / (T)))    ; Arrhenius relation for krill from Bahlburg et al. (2021)
 
   let J_a_Am 0.044                                     ; maximum area-specific assimilation rate (Jager & Ravagnan 2015)
   set J_A (frac * J_a_Am * L ^ 2 * T_factor_k)         ; mass flux for assimilation
@@ -724,7 +718,7 @@ to sexual_repro
     ; if W_R exceeds egg threshold, length exceeds 35 mm and its a day of October to March
     ; (which was taken from Bahlburg et al. (2021), eggs are produced
     if (ticks mod 365 < 91) or (ticks mod 365 > 272 ) [
-      if (W_R >= egg_threshold and L >= 7) [
+      if (W_R >= egg_threshold and L >= 35 * 0.2) [
         if n_spawn = 0 [
           set d_first_reproduction d_age       ; store age of first reproduction event
           if d_first_reproduction < d_k_firstrepro or d_k_firstrepro = 0 [
@@ -741,7 +735,6 @@ to sexual_repro
         hatch-clutches 1 [
           set l (1.72 * 0.2)                   ; this is already the length of C1 stage, but we assume that the first 30 days krill will not feed, the growth will be fed by the energy from the eggs
           set W_V (0.22 * (L) ^ 3)             ; structural body mass
-          set W_B 0                            ; assimilate buffer in egg
           set W_R 0                            ; reproduction buffer
           set J_A 0
           set J_V 0
@@ -770,7 +763,7 @@ to death
 
   ask oozoids [
     set d_age (d_age + 1)
-    if (d_age > 183 or n_repro = 5) [die]
+    if (d_age > 186 or n_repro = 5) [die]
     if (d_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
@@ -933,11 +926,9 @@ to calc_globals
       set generation 0
     ]
 
-    if plots?[
-      ; update Plot on reproduction cycles
-      set-current-plot "Seasonal reproduction cycles"
-      plot reg_cycles / 2
-    ]
+    ; update Plot on reproduction cycles
+    set-current-plot "Seasonal reproduction cycles"
+    plot reg_cycles / 2
   ]
 
   let n_month (floor ((ticks mod 365) / 30.5)) ; calculate month number based on ticks
@@ -973,6 +964,11 @@ to calc_globals
     ; calc mean size
     set l_k_mean (precision (mean [l] of krills) 2)
 
+    ; calc max size
+    let l_k_max_temp precision (max [l] of krills) 2
+    if l_k_max_temp > l_k_max [
+      set l_k_max l_k_max_temp
+    ]
   ]
 
   ; end of july, at the end of the Southern winter when abundances should be really low
@@ -1002,19 +998,21 @@ end
 
 to do_graphs
 
+  stop
   set-current-plot "Salp abundances"
   set-current-plot-pen "Aggregates"
   plotxy (ticks) n_blasto
   set-current-plot-pen "Solitaries"
   plotxy (ticks)  n_oozoids
 
-  set-current-plot "Max Chla"
+  set-current-plot "Max Chla [mg / m3]"
   set-current-plot-pen "pen-1"
   plotxy (ticks) (max [chla] of patches / resolution)
 
   set-current-plot "Krill abundances"
   set-current-plot-pen "Krill"
   plotxy (ticks) (count krills)
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -1082,7 +1080,7 @@ PLOT
 885
 10
 1290
-295
+230
 Salp abundances
 NIL
 NIL
@@ -1099,10 +1097,10 @@ PENS
 
 PLOT
 1295
-300
-1700
-585
-Max Chla
+235
+1695
+455
+Max Chla [mg / m3]
 NIL
 NIL
 0.0
@@ -1117,9 +1115,9 @@ PENS
 
 SLIDER
 15
-435
+400
 185
-468
+433
 salp_starvation
 salp_starvation
 0
@@ -1132,9 +1130,9 @@ HORIZONTAL
 
 SLIDER
 16
-480
+445
 188
-513
+478
 salp_mortality
 salp_mortality
 0
@@ -1166,7 +1164,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 5.0\nset blasto_resp 8.3\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.106\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immiprob 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_resp 3.7\nset blasto_resp 7.5\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.09\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
 NIL
 1
 T
@@ -1181,7 +1179,7 @@ PLOT
 1295
 10
 1700
-295
+230
 Seasonal reproduction cycles
 NIL
 NIL
@@ -1203,13 +1201,13 @@ CHOOSER
 chla_supply
 chla_supply
 "Const" "Lognorm"
-1
+0
 
 SLIDER
 15
-315
+280
 185
-348
+313
 salp_immiprob
 salp_immiprob
 0
@@ -1252,9 +1250,9 @@ HORIZONTAL
 
 SLIDER
 15
-275
+240
 257
-308
+273
 salp_halfsat
 salp_halfsat
 0
@@ -1267,9 +1265,9 @@ HORIZONTAL
 
 SLIDER
 15
-355
+320
 187
-388
+353
 salp_amount
 salp_amount
 0
@@ -1282,9 +1280,9 @@ HORIZONTAL
 
 SLIDER
 15
-395
+360
 187
-428
+393
 salp_length
 salp_length
 0
@@ -1297,9 +1295,9 @@ HORIZONTAL
 
 SLIDER
 15
-660
+625
 185
-693
+658
 krill_amount
 krill_amount
 0
@@ -1312,9 +1310,9 @@ HORIZONTAL
 
 SLIDER
 15
-740
+705
 185
-773
+738
 krill_hibernation
 krill_hibernation
 0
@@ -1327,9 +1325,9 @@ HORIZONTAL
 
 PLOT
 885
-300
+235
 1290
-585
+455
 Krill abundances
 NIL
 NIL
@@ -1345,14 +1343,14 @@ PENS
 
 SLIDER
 15
-520
+485
 185
-553
+518
 oozoid_resp
 oozoid_resp
 0
 100
-5.0
+3.7
 0.1
 1
 % / d
@@ -1360,14 +1358,14 @@ HORIZONTAL
 
 SLIDER
 15
-560
+525
 185
-593
+558
 blasto_resp
 blasto_resp
 0
 100
-8.3
+7.5
 0.1
 1
 % / d
@@ -1375,9 +1373,9 @@ HORIZONTAL
 
 TEXTBOX
 190
-435
+400
 350
-476
+441
 starvation capability (Groeneveld et al. 2020)
 12
 0.0
@@ -1385,9 +1383,9 @@ starvation capability (Groeneveld et al. 2020)
 
 TEXTBOX
 195
-480
+445
 350
-521
+486
 daily mortality (Groeneveld et al. 2020)
 12
 0.0
@@ -1405,9 +1403,9 @@ TEXTBOX
 
 TEXTBOX
 190
-315
+280
 370
-345
+310
 immigration probability (Groeneveld et al. 2020)
 12
 0.0
@@ -1435,9 +1433,9 @@ TEXTBOX
 
 TEXTBOX
 265
-275
+240
 420
-310
+275
 half saturarion salps (Groeneveld et al. 2020)
 12
 0.0
@@ -1445,9 +1443,9 @@ half saturarion salps (Groeneveld et al. 2020)
 
 TEXTBOX
 195
-740
+705
 460
-770
+735
 reduced metabolism of adult Krill during winter; Atkinson et al. (2002): < 30 %
 12
 0.0
@@ -1455,9 +1453,9 @@ reduced metabolism of adult Krill during winter; Atkinson et al. (2002): < 30 %
 
 TEXTBOX
 190
+320
 355
 355
-390
 immigration group size (Groeneveld et al. 2020)
 12
 0.0
@@ -1465,9 +1463,9 @@ immigration group size (Groeneveld et al. 2020)
 
 TEXTBOX
 190
-395
 360
-425
+360
+390
 length of individuals (Groeneveld et al. 2020)
 12
 0.0
@@ -1475,9 +1473,9 @@ length of individuals (Groeneveld et al. 2020)
 
 TEXTBOX
 190
-660
+625
 365
-690
+655
 initial population size
 12
 0.0
@@ -1485,9 +1483,9 @@ initial population size
 
 TEXTBOX
 195
-520
+485
 345
-555
+520
 C loss for respiration (Iguchi 2004): 2.5-4.9
 12
 0.0
@@ -1495,9 +1493,9 @@ C loss for respiration (Iguchi 2004): 2.5-4.9
 
 TEXTBOX
 195
-560
+525
 345
-590
+555
 C loss for respiration (Iguchi 2004): 0.8-6.1
 12
 0.0
@@ -1505,9 +1503,9 @@ C loss for respiration (Iguchi 2004): 0.8-6.1
 
 SLIDER
 15
-700
+665
 187
-733
+698
 krill_mortality
 krill_mortality
 0
@@ -1520,9 +1518,9 @@ HORIZONTAL
 
 TEXTBOX
 20
-255
+220
 235
-281
+246
 ----------- Salp parameter -----------
 12
 0.0
@@ -1530,9 +1528,9 @@ TEXTBOX
 
 TEXTBOX
 15
-600
+565
 255
-626
+591
 ----------- Krill parameter -----------
 12
 0.0
@@ -1540,9 +1538,9 @@ TEXTBOX
 
 TEXTBOX
 195
-700
+665
 350
-741
+706
 daily mortality (Auerswald et al., 2015)
 12
 0.0
@@ -1579,27 +1577,16 @@ SA?
 1
 -1000
 
-SWITCH
-15
-210
-118
-243
-plots?
-plots?
-0
-1
--1000
-
 SLIDER
 15
-620
+585
 247
-653
+618
 krill_halfsat
 krill_halfsat
 0
 1
-0.106
+0.09
 0.01
 1
 mg Chla / m³
@@ -1607,9 +1594,9 @@ HORIZONTAL
 
 TEXTBOX
 255
-620
+585
 415
-655
+620
 half saturation krill (Atkinson et al. 2006)
 12
 0.0
@@ -1641,16 +1628,6 @@ TEXTBOX
 340
 205
 random sampling of parameters for sensitivity analysis
-12
-0.0
-1
-
-TEXTBOX
-125
-210
-355
-236
-should plots be drawn / updated?
 12
 0.0
 1
@@ -2033,6 +2010,7 @@ NetLogo 6.2.0
   <experiment name="SA" repetitions="1000" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
+    <timeLimit steps="2160"/>
     <metric>vegetation_delay</metric>
     <metric>oozoid_resp</metric>
     <metric>krill_amount</metric>
@@ -2098,8 +2076,8 @@ NetLogo 6.2.0
     <enumeratedValueSet variable="blasto_resp">
       <value value="3"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="salps?">
-      <value value="false"/>
+    <enumeratedValueSet variable="species">
+      <value value="&quot;krill&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="chla_decay">
       <value value="0.05"/>
@@ -2109,9 +2087,6 @@ NetLogo 6.2.0
     </enumeratedValueSet>
     <enumeratedValueSet variable="salp_halfsat">
       <value value="0.2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="MeasureInc?">
-      <value value="false"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="chla_supply">
       <value value="&quot;Const&quot;"/>
@@ -2171,8 +2146,6 @@ NetLogo 6.2.0
     <metric>max [n_spawn] of krills</metric>
     <metric>max[d_starvation] of krills</metric>
     <metric>max[d_first_reproduction] of krills</metric>
-    <metric>min [W_B] of krills</metric>
-    <metric>max[W_B] of krills</metric>
     <metric>min [L] of clutches</metric>
     <metric>max [L] of clutches</metric>
     <metric>min [W_R] of clutches</metric>
@@ -2192,8 +2165,6 @@ NetLogo 6.2.0
     <metric>max [number] of clutches</metric>
     <metric>max[d_starvation] of clutches</metric>
     <metric>max[d_first_reproduction] of clutches</metric>
-    <metric>min [W_B] of clutches</metric>
-    <metric>max[W_B] of clutches</metric>
     <metric>min [l] of oozoids</metric>
     <metric>max [l] of oozoids</metric>
     <metric>max [d_age] of oozoids</metric>
@@ -2238,7 +2209,8 @@ NetLogo 6.2.0
   <experiment name="population" repetitions="40" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
-    <timeLimit steps="14600"/>
+    <timeLimit steps="10950"/>
+    <metric>chla_max</metric>
     <metric>n_k_now</metric>
     <metric>l_k_mean</metric>
     <metric>n_k_eggs</metric>
@@ -2246,6 +2218,20 @@ NetLogo 6.2.0
       <value value="&quot;krill&quot;"/>
       <value value="&quot;both&quot;"/>
     </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_supply">
+      <value value="&quot;Const&quot;"/>
+      <value value="&quot;Lognorm&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="oozoid-resp" repetitions="100" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="2160"/>
+    <metric>oozoid_resp</metric>
+    <metric>max [l] of oozoids</metric>
+    <metric>min [l] of oozoids</metric>
+    <metric>reg_cycles</metric>
+    <metric>reg_cycles_max</metric>
     <enumeratedValueSet variable="chla_supply">
       <value value="&quot;Const&quot;"/>
       <value value="&quot;Lognorm&quot;"/>
