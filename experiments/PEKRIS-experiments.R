@@ -66,7 +66,7 @@ ddf$chla_max <- ddf$chla_max * ddf$maximum / max(df$chla_max)
 # rename parameter values for plotting
 ddf[ddf$chla_supply=="Const",2] <- "constant max chlorophyll a density"
 ddf[ddf$chla_supply=="Lognorm",2] <- "varying max chlorophyll a density"
-ddf[ddf$measure=="n_k_now",5] <- "abundancy [n] krill"
+ddf[ddf$measure=="n_k_now",5] <- "abundance [n] krill"
 ddf[ddf$measure=="l_k_mean",5] <- "mean length [mm] krill"
 ddf[ddf$measure=="n_k_eggs",5] <- "sum of eggs layed [n]"
 ddf[ddf$species=="both",1] <- "salps & krill"
@@ -112,7 +112,7 @@ aggregate(cbind(n_k_now,l_k_mean,n_k_eggs)~species+chla_supply,
 # test of significant differences for mean length
 anova(lm(l_k_mean~species*chla_supply,df))
 
-# test of significant differences for abundancy
+# test of significant differences for abundance
 df$rk1 <- rank(df$n_k_now) # rank transformation
 dd <- anova(lm(rk1~species*chla_supply,df)) # anova of ranks
 ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # sum of Sum Squares
@@ -152,15 +152,10 @@ theme_update(axis.text.x = element_text(colour="black"),
 library("tidyr") # load tidyr
 library("scales") # load scales
 
-str(df)
-str(ddf)
-
 # change table from wide to long format
 ddf <- gather(df,key="measure",value="value",c("n_k_now","l_k_mean","n_k_eggs"))
 
-str(ddf)
-
-ddf$measure <- c(rep("abundancy krill [n]",nrow(ddf)/3),
+ddf$measure <- c(rep("abundance krill [n]",nrow(ddf)/3),
                  rep("mean length of krill [mm]",nrow(ddf)/3),
                  rep("sum of eggs layed [n]",nrow(ddf)/3))
 
