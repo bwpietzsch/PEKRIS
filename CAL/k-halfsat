@@ -1,0 +1,14 @@
++ examining the simulation results for calibrating krill_halfsat, it can not exceed 0.218 as after that no eggs are produced which is unrealistic
++ following Atkinson et al. (2006), half saturation constant should not fall below 0.082
+
+Bahlburg et al. (2021):
++ using results of palmer scenario (closer chla availability to ours)
++ first spawning: in third summer (Dec-Jan)
++ max size: 46 mm with active metabolic scaling
++ max eggs: 21,100 with active metabolic scaling
+
+best fit for this:
++ halfsat = 0.09
++ first repro: 1073 d / 09.12.3
++ max l: 45.9 mm
++ max eggs: 10,574 n
