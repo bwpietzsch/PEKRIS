@@ -99,7 +99,7 @@ dev.off()
 # test for differences ----------------------------------------------------
 
 # set working directory accordingly
-setwd("/home/bruno/Nextcloud/PEKRIS/013-experiments/")
+setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
 
 # import simulation results
 df <- read.csv("output/PEKRIS-population-trimmed.csv")
@@ -161,12 +161,15 @@ ddf$measure <- c(rep("abundance krill [n]",nrow(ddf)/3),
 
 ggplot(ddf,aes(x=chla_supply,y=value,fill=species)) +
   geom_boxplot() +
-  scale_fill_manual(values=c("#E69F00","#56B4E9")) +
+  scale_fill_manual(values=c("#E69F00","#56B4E9"),
+                    labels=c("yes","no"),
+                    name="salps present?") +
   scale_y_continuous(labels=comma) +
   facet_wrap(measure~.,
              scales="free_y",
              ncol=2) +
-  labs(x="",y="")
+  labs(x="",y="") +
+  theme(legend.text=element_text(size=12))
 
 # export this plot as PDF file
 ggsave("figures/experiments-differences.pdf",width=7,height=6)
