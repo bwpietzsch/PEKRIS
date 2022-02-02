@@ -2214,6 +2214,8 @@ NetLogo 6.2.0
     <metric>n_k_now</metric>
     <metric>l_k_mean</metric>
     <metric>n_k_eggs</metric>
+    <metric>n_s_max</metric>
+    <metric>n_s_med</metric>
     <enumeratedValueSet variable="species">
       <value value="&quot;krill&quot;"/>
       <value value="&quot;both&quot;"/>
