@@ -1,7 +1,5 @@
-# variance proportions ----------------------------------------------------
-
 # set working directory accordingly
-setwd("/home/bruno/Nextcloud/PEKRIS/009-SA/")
+setwd("C:/Users/bruno/ownCloud/PEKRIS/009-SA")
 
 # import raw results
 df <- read.csv("3-results/SA-PEKRIS.csv",skip=6)
@@ -152,10 +150,10 @@ oresult$parameter <- factor(oresult$parameter,levels=c("chla_growth","chla_decay
 
 oresult$response <- factor(oresult$response,levels=c("n_s_max_total","n_s_med","l_k_max","n_k_max_eggs","d_k_firstrepro"))
 
-# rename response variables
-# levels(oresult$response) <- c("max abundance Salps [n]","median abundance Salps [n]","max size Krill [mm]",
-#                               "max amount eggs per Krill [n]","first reproduction Krill [d]")
+levels(oresult$response) <- c("max_abundance_salp_day","median_abundance_salp_overall","max_length_krill",
+                              "max_eggs_krill","age_of_first_reproduction_krill")
 
+levels(oresult$parameter)[5] <- "oozoid_respiration"
 
 # plot data
 library("ggplot2")
@@ -175,134 +173,3 @@ ggsave("4-plots/SA-anova.pdf",width=5.5,height=4)
 # delete everything
 rm(list=ls())
 dev.off()
-
-# main effect plots --------------------------------------------------
-
-# set working directory accordingly
-setwd("/home/bruno/Nextcloud/PEKRIS/009-SA/")
-
-# import raw results
-df <- read.csv("3-results/SA-PEKRIS.csv",skip=6)
-
-# convert krill length to mm
-df$l_k_max <- df$l_k_max / 0.2
-
-# load ggplot library
-library("ggplot2")
-
-# define function for multiple plots in ggplot
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  library(grid)
-  
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-  
-  numPlots = length(plots)
-  
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                     ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-  
-  if (numPlots==1) {
-    print(plots[[1]])
-    
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
-    
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-      
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
-
-# set black white theme
-theme_set(theme_bw())
-
-# set black labels
-theme_update(axis.text.x = element_text(colour="black"),
-                   axis.text.y = element_text(colour="black"))
-
-# plot main effects for d_k_firstrepro
-p1 <- ggplot(df,aes(krill_halfsat,d_k_firstrepro)) +
-  geom_point(size=0.5)
-  
-p2 <- ggplot(df,aes(chla_decay,d_k_firstrepro)) +
-  geom_point(size=0.5)
-
-p3 <- ggplot(df,aes(chla_growth,d_k_firstrepro)) +
-  geom_point(size=0.5)
-
-pdf("4-plots/SA-ME-firstrepro.pdf",width=9,height=3)
-multiplot(p1,p2,p3,cols=3)
-dev.off()
-
-# plot main effects for n_k_max_eggs
-p4 <- ggplot(df,aes(krill_halfsat,n_k_max_eggs)) +
-  geom_point(size=0.5)
-
-p5 <- ggplot(df,aes(chla_decay,n_k_max_eggs)) +
-  geom_point(size=0.5)
-
-p6 <- ggplot(df,aes(chla_growth,n_k_max_eggs)) +
-  geom_point(size=0.5)
-
-pdf("4-plots/SA-ME-maxeggs.pdf",width = 9,height = 3)
-multiplot(p4,p5,p6,cols=3)
-dev.off()
-
-# plot main effect for l_k_max
-p7 <- ggplot(df,aes(krill_halfsat,l_k_max)) +
-  geom_point(size=0.5)
-
-p8 <- ggplot(df,aes(chla_decay,l_k_max)) +
-  geom_point(size=0.5)
-
-p9 <- ggplot(df,aes(chla_growth,l_k_max)) +
-  geom_point(size=0.5)
-
-pdf("4-plots/SA-ME-lkmax.pdf",width = 9,height = 3)
-multiplot(p7,p8,p9,cols=3)
-dev.off()
-
-# plot main effect for n_s_max_total
-p10 <- ggplot(df,aes(oozoid_resp,n_s_max_total)) +
-  geom_point(size=0.5)
-
-p11 <- ggplot(df,aes(salp_halfsat,n_s_max_total)) +
-  geom_point(size=0.5)
-
-p12 <- ggplot(df,aes(salp_mortality,n_s_max_total)) +
-  geom_point(size=0.5)
-
-pdf("4-plots/SA-ME-nstotal.pdf",width = 9,height = 3)
-multiplot(p10,p11,p12,cols=3)
-dev.off()
-
-# plot main effect for n_s_med
-p13 <- ggplot(df,aes(oozoid_resp,n_s_med)) +
-  geom_point(size=0.5)
-
-p14 <- ggplot(df,aes(salp_mortality,n_s_med)) +
-  geom_point(size=0.5)
-
-p15 <- ggplot(df,aes(salp_halfsat,n_s_med)) +
-  geom_point(size=0.5)
-
-pdf("4-plots/SA-ME-nsmed.pdf",width = 9,height = 3)
-multiplot(p13,p14,p15,cols=3)
-dev.off()
-
-dev.off()
-rm(list=ls())
