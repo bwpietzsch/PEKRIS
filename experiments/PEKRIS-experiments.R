@@ -99,7 +99,7 @@ ggplot(ddf[ddf$species=="salps & krill",],aes(x=year,value)) +
          linetype=guide_legend(title=NULL))
 
 # export this plot as PDF file
-ggsave("figures/experiments-both-salps.pdf",width=7,height=6)  
+ggsave("figures/experiments-both-salps.pdf",width=6,height=5)  
 
 # delete obsolete data
 rm(list=ls())
@@ -180,7 +180,7 @@ ggplot(ddf[ddf$value<8000,],aes(x=chla_supply,y=value)) +
   theme(legend.text=element_text(size=12))
 
 # export this plot as PDF file
-ggsave("figures/experiments-differences-salp.pdf",width=8,height=5)
+ggsave("figures/experiments-differences-salp.pdf",width=6,height=4)
 
 # delete everything
 rm(list=ls())
@@ -240,13 +240,14 @@ ggplot(ddf,aes(x=year,value)) +
                      sec.axis=sec_axis(~./max(.)*max(df$chla_max),
                      name="max chl a density [mg / m3]")) +
   facet_grid(measure~chla_supply,scales="free_y",switch="y") +
+  # facet_wrap(chla_supply~measure,scales="free_y",strip.position = "top") +
   labs(x="year") +
   scale_alpha(labels="chlorophyll a density") +
   guides(alpha=guide_legend(title=NULL),
          linetype=guide_legend(title=NULL))
 
 # export this plot as PDF file
-ggsave("figures/experiments-both.pdf",width=7,height=8)  
+ggsave("figures/experiments-both.pdf",width=6,height=8)  
 
 # delete everything
 rm(list=ls())
@@ -304,7 +305,6 @@ theme_update(axis.text.x = element_text(colour="black"),
              plot.title = element_text(hjust = 0.5),
              panel.border = element_rect(colour = "black", fill=NA, size=0.6),
              legend.position="bottom")
-             # legend.position=c(0.8,0.2))
 
 library("tidyr") # load tidyr
 library("scales") # load scales
@@ -314,7 +314,7 @@ ddf <- gather(df,key="measure",value="value",c("n_k_now","l_k_mean","n_k_eggs"))
 
 ddf$measure <- c(rep("abundance krill [n]",nrow(ddf)/3),
                  rep("mean length of krill [mm]",nrow(ddf)/3),
-                 rep("sum of eggs layed [n]",nrow(ddf)/3))
+                 rep("sum of eggs laid [n]",nrow(ddf)/3))
 
 ggplot(ddf,aes(x=chla_supply,y=value,fill=species)) +
   geom_boxplot() +
@@ -330,7 +330,7 @@ ggplot(ddf,aes(x=chla_supply,y=value,fill=species)) +
 
 # export this plot as PDF file
 # ggsave("figures/experiments-differences.pdf",width=7,height=6)
-ggsave("figures/experiments-differences.pdf",width=10,height=5)
+ggsave("figures/experiments-differences.pdf",width=9,height=4)
 
 # delete everything
 rm(list=ls())
