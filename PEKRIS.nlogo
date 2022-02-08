@@ -2088,7 +2088,7 @@ NetLogo 6.2.0
       <value value="0"/>
     </enumeratedValueSet>
   </experiment>
-  <experiment name="blasto-resp" repetitions="100" runMetricsEveryStep="true">
+  <experiment name="blastozoid-respiration" repetitions="100" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
     <timeLimit steps="2160"/>
@@ -2218,7 +2218,7 @@ NetLogo 6.2.0
       <value value="&quot;Lognorm&quot;"/>
     </enumeratedValueSet>
   </experiment>
-  <experiment name="oozoid-resp" repetitions="100" runMetricsEveryStep="true">
+  <experiment name="oozoid-respiration" repetitions="100" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
     <timeLimit steps="2160"/>
