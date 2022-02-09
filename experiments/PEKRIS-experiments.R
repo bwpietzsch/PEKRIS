@@ -7,7 +7,7 @@ setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
 df <- read.csv("output/PEKRIS-population.csv",skip=6)
 
 # convert krill structural length to real length in mm
-df$mean_length_krill <- df$mean_length_krill / 0.02
+df$l_k_mean <- df$l_k_mean / 0.02
 
 # change steps to factor
 df$X.step. <- as.factor(df$X.step.)
@@ -22,13 +22,13 @@ df$X.step. <- as.numeric(levels(df$X.step.))[df$X.step.]
 df$year <- floor(df$X.step./365)
 
 # calculate mean of repetitions and years
-df2 <- aggregate(cbind(abundance_krill,mean_length_krill,sum_eggs_krill,max_chla_density,median_abundace_salp_overall)~species+chla_supply+year,df,mean)
+df2 <- aggregate(cbind(n_k_now,l_k_mean,n_k_eggs,chla_max,n_s_med)~species+chla_supply+year,df,mean)
 
 # calculate max of salp abundance
-df3 <- aggregate(max_abundance_salp_season~species+chla_supply+year,df,max)
+df3 <- aggregate(n_s_max~species+chla_supply+year,df,max)
 
 # combine data frames
-df2$max_abundance_salp_season <- df3$max_abundance_salp_season
+df2$n_s_max <- df3$n_s_max
 
 # remove first 12 years (transient phase)
 df2 <- df2[df2$year>12,]
@@ -64,19 +64,19 @@ theme_update(axis.text.x = element_text(colour="black"),
 library("tidyr")
 
 # change table from wide to long format
-ddf <- gather(df,key="measure",value="value",c("max_abundance_salp_season","median_abundance_salp_overall"))
+ddf <- gather(df,key="measure",value="value",c("n_s_max","n_s_med"))
 
 # add maximum of each output as own column
-ddf$maximum <- c(rep(max(df$max_abundance_salp_season),nrow(ddf)/2),rep(max(df$median_abundance_salp_overall),nrow(ddf)/2))
+ddf$maximum <- c(rep(max(df$n_s_max),nrow(ddf)/2),rep(max(df$n_s_med),nrow(ddf)/2))
 
 # calculate max chl a densities scaled to the maximum of each output
-ddf$max_chla_density <- ddf$max_chla_density * ddf$maximum / max(df$max_chla_density)
+ddf$chla_max <- ddf$chla_max * ddf$maximum / max(df$chla_max)
 
 # rename parameter values for plotting
 ddf[ddf$chla_supply=="Const",2] <- "constant max chlorophyll a density"
 ddf[ddf$chla_supply=="Lognorm",2] <- "varying max chlorophyll a density"
-ddf[ddf$measure=="max_abundance_salp_season",8] <- "max peak abundance [n] salp"
-ddf[ddf$measure=="median_abundance_salp_overall",8] <- "median abundance [n] salp"
+ddf[ddf$measure=="n_s_max",8] <- "max peak abundance [n] salp"
+ddf[ddf$measure=="n_s_med",8] <- "median abundance [n] salp"
 ddf[ddf$species=="both",1] <- "salps & krill"
 ddf[ddf$species=="krill",1] <- "krill only"
 
@@ -84,13 +84,13 @@ library("scales")
 
 # plot all together
 ggplot(ddf[ddf$species=="salps & krill",],aes(x=year,value)) +
-  geom_ribbon(aes(x=year,ymax=max_chla_density,ymin=0,alpha=0.5),col="green4",fill="green4") +
+  geom_ribbon(aes(x=year,ymax=chla_max,ymin=0,alpha=0.5),col="green4",fill="green4") +
   geom_line() +
   theme(strip.background = element_blank(),
         strip.placement = "outside") +
   scale_y_continuous("model output",
                      labels=comma,
-                     sec.axis=sec_axis(~./max(.)*max(df$max_chla_density),
+                     sec.axis=sec_axis(~./max(.)*max(df$chla_max),
                                        name="max chl a density [mg / m3]")) +
   facet_grid(measure~chla_supply,scales="free_y",switch="y") +
   labs(x="year") +
@@ -117,12 +117,12 @@ df <- read.csv("output/PEKRIS-population-trimmed.csv")
 df <- df[df$species=="both",]
 
 # test for normal distribution of data
-aggregate(cbind(max_abundance_salp_season,median_abundance_salp_overall)~chla_supply,
+aggregate(cbind(n_s_max,n_s_med)~chla_supply,
           df,
           function(x) shapiro.test(x)$p.value)
 
 # test of significant differences for salp max abundance
-df$rk1 <- rank(df$max_abundance_salp_season) # rank transformation
+df$rk1 <- rank(df$n_s_max) # rank transformation
 dd <- anova(lm(rk1~chla_supply,df)) # anova of ranks
 ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # sum of Sum Squares
 dd$`F value` = dd$`Sum Sq` / ddsum # divide sum square by proportions
@@ -130,7 +130,7 @@ dd$`Pr(>F)` = 1 - pchisq(dd$`F value`,1) # calculate p-values
 dd
 
 # test of significant differences for salp max abundance
-df$rk1 <- rank(df$median_abundance_salp_overall) # rank transformation
+df$rk1 <- rank(df$n_s_med) # rank transformation
 dd <- anova(lm(rk1~chla_supply,df)) # anova of ranks
 ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # sum of Sum Squares
 dd$`F value` = dd$`Sum Sq` / ddsum # divide sum square by proportions
@@ -162,7 +162,7 @@ library("tidyr") # load tidyr
 library("scales") # load scales
 
 # change table from wide to long format
-ddf <- gather(df,key="measure",value="value",c("max_abundance_salp_season","median_abundance_salp_overall"))
+ddf <- gather(df,key="measure",value="value",c("n_s_max","n_s_med"))
 
 ddf$measure <- c(rep("max abundance salp [n]",nrow(ddf)/2),
                  rep("med abundance salp [mm]",nrow(ddf)/2))
@@ -211,33 +211,33 @@ theme_update(axis.text.x = element_text(colour="black"),
 library("tidyr")
 
 # change table from wide to long format
-ddf <- gather(df,key="measure",value="value",c("abundance_krill","mean_length_krill","sum_eggs_krill"))
+ddf <- gather(df,key="measure",value="value",c("n_k_now","l_k_mean","n_k_eggs"))
 
 # add maximum of each output as own column
-ddf$maximum <- c(rep(max(df$abundance_krill),nrow(ddf)/3),rep(max(df$mean_length_krill),nrow(ddf)/3),rep(max(df$sum_eggs_krill),nrow(ddf)/3))
+ddf$maximum <- c(rep(max(df$n_k_now),nrow(ddf)/3),rep(max(df$l_k_mean),nrow(ddf)/3),rep(max(df$n_k_eggs),nrow(ddf)/3))
 
-# calculate max chla densities scaled to the maximum of each output
-ddf$max_chla_density <- ddf$max_chla_density * ddf$maximum / max(df$max_chla_density)
+# calculate max chl a densities scaled to the maximum of each output
+ddf$chla_max <- ddf$chla_max * ddf$maximum / max(df$chla_max)
 
 # rename parameter values for plotting
 ddf[ddf$chla_supply=="Const",2] <- "constant max chlorophyll a density"
 ddf[ddf$chla_supply=="Lognorm",2] <- "varying max chlorophyll a density"
-ddf[ddf$measure=="abundance_krill",7] <- "abundance [n] krill"
-ddf[ddf$measure=="mean_length_krill",7] <- "mean length [mm] krill"
-ddf[ddf$measure=="sum_eggs_krill",7] <- "sum of eggs layed [n]"
+ddf[ddf$measure=="n_k_now",7] <- "abundance [n] krill"
+ddf[ddf$measure=="l_k_mean",7] <- "mean length [mm] krill"
+ddf[ddf$measure=="n_k_eggs",7] <- "sum of eggs layed [n]"
 ddf[ddf$species=="both",1] <- "salps & krill"
 ddf[ddf$species=="krill",1] <- "krill only"
 
 library("scales")
 # plot all together
 ggplot(ddf,aes(x=year,value)) +
-  geom_ribbon(aes(x=year,ymax=max_chla_density,ymin=0,alpha=0.5),col="green4",fill="green4") +
+  geom_ribbon(aes(x=year,ymax=chla_max,ymin=0,alpha=0.5),col="green4",fill="green4") +
   geom_line(aes(linetype=species)) +
   theme(strip.background = element_blank(),
         strip.placement = "outside") +
   scale_y_continuous("model output",
                      labels=comma,
-                     sec.axis=sec_axis(~./max(.)*max(df$max_chla_density),
+                     sec.axis=sec_axis(~./max(.)*max(df$chla_max),
                      name="max chl a density [mg / m3]")) +
   facet_grid(measure~chla_supply,scales="free_y",switch="y") +
   # facet_wrap(chla_supply~measure,scales="free_y",strip.position = "top") +
@@ -262,15 +262,15 @@ setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
 df <- read.csv("output/PEKRIS-population-trimmed.csv")
 
 # test for normal distribution of krill data
-aggregate(cbind(abundance_krill,mean_length_krill,sum_eggs_krill)~species+chla_supply,
+aggregate(cbind(n_k_now,l_k_mean,n_k_eggs)~species+chla_supply,
           df,
           function(x) shapiro.test(x)$p.value)
 
 # test of significant differences for mean krill length
-anova(lm(mean_length_krill~species*chla_supply,df))
+anova(lm(l_k_mean~species*chla_supply,df))
 
 # test of significant differences for krill abundance
-df$rk1 <- rank(df$abundance_krill) # rank transformation
+df$rk1 <- rank(df$n_k_now) # rank transformation
 dd <- anova(lm(rk1~species*chla_supply,df)) # anova of ranks
 ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # sum of Sum Squares
 dd$`F value` = dd$`Sum Sq` / ddsum # divide sum square by proportions
@@ -278,7 +278,7 @@ dd$`Pr(>F)` = 1 - pchisq(dd$`F value`,1) # calculate p-values
 dd
 
 # test of significant differences for egg amount
-df$rk2 <- rank(df$sum_eggs_krill) # rank transformation
+df$rk2 <- rank(df$n_k_eggs) # rank transformation
 dd <- anova(lm(rk2~species*chla_supply,df)) # anova of ranks
 ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # sum of Sum Squares
 dd$`F value` = dd$`Sum Sq` / ddsum # divide sum square by proportions
@@ -310,7 +310,7 @@ library("tidyr") # load tidyr
 library("scales") # load scales
 
 # change table from wide to long format
-ddf <- gather(df,key="measure",value="value",c("abundance_krill","mean_length_krill","sum_eggs_krill"))
+ddf <- gather(df,key="measure",value="value",c("n_k_now","l_k_mean","n_k_eggs"))
 
 ddf$measure <- c(rep("abundance krill [n]",nrow(ddf)/3),
                  rep("mean length of krill [mm]",nrow(ddf)/3),
