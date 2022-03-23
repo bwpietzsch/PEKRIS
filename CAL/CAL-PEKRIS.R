@@ -299,3 +299,46 @@ dev.off()
 
 rm(list=ls())
 dev.off()
+
+# check abundance salps ---------------------------------------------------------
+
+# set working directory accordingly
+setwd("C:/Users/Bruno/ownCloud/PEKRIS/012-calibration/")
+
+# import simulation results
+df <- read.csv("results/CAL-PEKRIS-salptest.csv",skip=6)
+
+# convert krill structural length to real length in mm
+df$mean_length_krill <- df$mean_length_krill / 0.02
+
+# change steps to factor
+df$X.step. <- as.factor(df$X.step.)
+
+# rename levels to match year number
+levels(df$X.step.) <- (c(1:nlevels(df$X.step.)))
+
+# convert to numeric
+df$X.step. <- as.numeric(levels(df$X.step.))[df$X.step.]
+
+# retrieve model outputs for salp (calculated only on the 180th day of each year)
+df1 <- df[df$X.step. %in% seq(180,65*180,365),]
+
+# calculate year number
+df$year <- floor(df$X.step./365) + 1
+df1$year <- floor(df1$X.step./365)
+
+# calculate mean of salp abundances
+df1 <- aggregate(cbind(max_abundance_salp_season,median_abundance_salp_overall)~chla_supply+year+blastozoid_respiration+oozoid_respiration,df1,mean)
+
+library("ggplot2")
+
+ggplot(df1,aes(x=year,y=max_abundance_salp_season)) +
+  geom_line() +
+  facet_grid(blastozoid_respiration~oozoid_respiration) +
+  theme_bw()
+
+ggsave("plots/CAL-salp-abundance.pdf",width=12,height=8)
+
+# delete everything
+rm(list=ls())
+dev.off()
