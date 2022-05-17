@@ -2,6 +2,7 @@
 ;; larval inclduing juvenile krill < 35 mm will stay active all year round while adult krill will hibernate. The larval stage is not actively represented and only relevant in the growing process
 ;; To model larvae cohorts are modelled called clutches to avoid computational problems
 
+extensions[GIS]
 
 breed [oozoids oozoid ]        ; one life from of salps that reproduces asexually by releasing chains
 breed [blastozoids blastozoid] ; one life form of salps - here the male blastozoids are called blastozoids in the model
@@ -262,6 +263,8 @@ to go
   move                                                 ; random walk of krill and salps
   calculate_global_results                             ; calculate globals and results
   update_plots                                         ; update plots
+
+  ;if ((count oozoids + count blastozoids + sum [number] of chains) > 500) [stop]
 
   tick                                                 ; advance time step by one
 
@@ -757,26 +760,26 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to death
-  ; salps die after half a year (Siegel 2017 mentiones a few month as maximum age)
+  ; salps die after 5 to 15 months: Loeb and Santora give at least 15 months for solitary (oozoid) and 5 month for aggregate (chain, blastozooid)
   ; or due to daily mortality or due to starvation (30 days)
 
   ask oozoids [
     set age (age + 1)
-    if (age > 186 or number_of_chain_releases = 5) [die]
+    if (age > 450 or number_of_chain_releases = 5) [die]
     if (days_of_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask blastozoids [
     set age (age + 1)
-    if (age > 365) [die]
+    if (age > 150) [die]
     if (days_of_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask chains [
     set age (age + 1)
-    if (age > 186) [die]
+    if (age > 150) [die]
     if (days_of_starvation > salp_starvation) [die]
     let counter 0
     if (number > 0) [
@@ -1008,6 +1011,13 @@ to update_plots
   plotxy (ticks) (count krills)
 
 end
+
+to export_raster
+  gis:set-world-envelope (list min-pxcor max-pxcor min-pycor max-pycor)
+  let export-raster gis:patch-dataset chla
+  let nsalps (count oozoids + count blastozoids + sum [number] of chains)
+  gis:store-dataset export-raster (word "C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/figures/" nsalps ".asc")
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 470
@@ -1158,7 +1168,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immigration_probability 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_respiration 3.7\nset blastozoid_respiration 7.5\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.09\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immigration_probability 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_respiration 2.5\nset blastozoid_respiration 7.5\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.09\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
 NIL
 1
 T
@@ -1195,7 +1205,7 @@ CHOOSER
 chla_supply
 chla_supply
 "Const" "Lognorm"
-0
+1
 
 SLIDER
 15
@@ -1344,7 +1354,7 @@ oozoid_respiration
 oozoid_respiration
 0
 100
-3.7
+2.5
 0.1
 1
 % / d
@@ -1604,7 +1614,7 @@ CHOOSER
 species
 species
 "krill" "salps" "both"
-2
+1
 
 TEXTBOX
 120
@@ -1624,6 +1634,23 @@ TEXTBOX
 random sampling of parameters for sensitivity analysis
 12
 0.0
+1
+
+BUTTON
+850
+665
+957
+698
+NIL
+export_raster
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
 1
 
 @#$#@#$#@
@@ -2199,25 +2226,6 @@ NetLogo 6.2.0
       <value value="&quot;Lognorm&quot;"/>
     </enumeratedValueSet>
   </experiment>
-  <experiment name="population" repetitions="40" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="10950"/>
-    <metric>max_chla_density</metric>
-    <metric>abundance_krill</metric>
-    <metric>mean_length_krill</metric>
-    <metric>sum_eggs_krill</metric>
-    <metric>max_abundance_salp_season</metric>
-    <metric>median_abundance_salp_overall</metric>
-    <enumeratedValueSet variable="species">
-      <value value="&quot;krill&quot;"/>
-      <value value="&quot;both&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
-  </experiment>
   <experiment name="oozoid-respiration" repetitions="100" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
@@ -2256,6 +2264,25 @@ NetLogo 6.2.0
       <value value="1.89"/>
       <value value="2.96"/>
       <value value="3.7"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="population" repetitions="40" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="11315"/>
+    <metric>max_chla_density</metric>
+    <metric>abundance_krill</metric>
+    <metric>mean_length_krill</metric>
+    <metric>sum_eggs_krill</metric>
+    <metric>max_abundance_salp_season</metric>
+    <metric>median_abundance_salp_overall</metric>
+    <enumeratedValueSet variable="species">
+      <value value="&quot;krill&quot;"/>
+      <value value="&quot;both&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="chla_supply">
+      <value value="&quot;Const&quot;"/>
+      <value value="&quot;Lognorm&quot;"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>
