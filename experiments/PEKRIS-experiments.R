@@ -7,7 +7,7 @@ setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
 df <- read.csv("output/PEKRIS-population.csv",skip=6)
 
 # convert krill structural length to real length in mm
-df$mean_length_krill <- df$mean_length_krill / 0.02
+df$mean_length_krill <- df$mean_length_krill / 0.2
 
 # change steps to factor
 df$X.step. <- as.factor(df$X.step.)
@@ -28,15 +28,17 @@ df1$year <- floor(df1$X.step./365)
 # calculate mean of repetitions and years
 df2 <- aggregate(cbind(abundance_krill,mean_length_krill,sum_eggs_krill,max_chla_density)~species+chla_supply+year,df,mean)
 
-# calculate mean of salp abundances
+# calculate mean and max of salp abundances
 df1 <- aggregate(cbind(max_abundance_salp_season,median_abundance_salp_overall)~species+chla_supply+year,df1,mean)
 
 # remove incomplete 31st year
 df2 <- df2[df2$year<31,]
 
 # combine data frames inserting NA for incomplete last year
-df2$median_abundance_salp_overall <- c(df1$median_abundance_salp_overall[5:120],NA,NA,NA,NA)
-df2$max_abundance_salp_season <- c(df1$max_abundance_salp_season[5:120],NA,NA,NA,NA)
+# df2$median_abundance_salp_overall <- c(df1$median_abundance_salp_overall[5:120],NA,NA,NA,NA)
+df2$median_abundance_salp_overall <- c(df1$median_abundance_salp_overall[5:124])
+# df2$max_abundance_salp_season <- c(df1$max_abundance_salp_season[5:120],NA,NA,NA,NA)
+df2$max_abundance_salp_season <- c(df1$max_abundance_salp_season[5:124])
 
 # safe data frame 
 write.csv(df2,"output/PEKRIS-population-trimmed.csv",row.names=F)
@@ -54,6 +56,10 @@ df <- read.csv("output/PEKRIS-population-trimmed.csv")
 
 # delete first 12 years as transient phase
 df <- df[df$year>12,]
+
+# export for calculation of year 30 differences
+# df1 <- df[df$year==30,]
+# write.csv2(df1,"figures/year30-raw.csv",row.names = F)
 
 # load library for plotting
 library("ggplot2")
@@ -96,11 +102,13 @@ ddf$max_chla_density <- ddf$max_chla_density * ddf$maximum / max(df$max_chla_den
 
 library("scales")
 str(ddf)
-ddf[ddf$species=="krill"&ddf$measure=="max_abundance_salp_season",7] <- NA
+ddf[ddf$species=="krill"&ddf$measure=="max_abundance_salp_season",c(7,8)] <- NA
 
 ddf$measure <- as.factor(ddf$measure)
 ddf$measure <- factor(ddf$measure,levels=c("abundance_krill","mean_length_krill","sum_eggs_krill","max_abundance_salp_season"))
-levels(ddf$measure)
+
+ddf$species <- as.factor(ddf$species)
+levels(ddf$species) <- c("krill & salps","krill only")
 
 # plot all together
 ggplot(ddf,aes(x=year,value)) +
@@ -119,8 +127,8 @@ ggplot(ddf,aes(x=year,value)) +
          linetype=guide_legend(title=NULL))
 
 # export this plot as PDF file
-# ggsave("figures/experiments-both.pdf",width=6,height=8)
-ggsave("figures/experiments-both.pdf",width=7,height=10)  
+# ggsave("figures/experiments-both.tiff",width=7,height=10,dpi=800)
+ggsave("figures/experiments-both.tiff",width=16,height=22,units="cm",dpi=800)
 
 # delete everything
 rm(list=ls())
@@ -167,7 +175,7 @@ df <- df[,-c(8,9)]
 
 # rename levels of chl a supply
 df$chla_supply <- as.factor(df$chla_supply)
-levels(df$chla_supply) <- c("Constant Chl a","Lognorm Chl a")
+levels(df$chla_supply) <- c("Constant","Lognorm")
 
 # load ggplot
 library("ggplot2")
@@ -178,6 +186,7 @@ theme_set(theme_bw())
 # set black labels
 theme_update(axis.text.x = element_text(colour="black"),
              axis.text.y = element_text(colour="black"),
+             # text=element_text(size=9),
              plot.title = element_text(hjust = 0.5),
              panel.border = element_rect(colour = "black", fill=NA, size=0.6),
              legend.position="bottom")
@@ -190,7 +199,7 @@ ddf <- gather(df,key="measure",value="value",c("abundance_krill","mean_length_kr
 
 ddf$measure <- c(rep("abundance krill [n]",nrow(ddf)/3),
                  rep("mean length of krill [mm]",nrow(ddf)/3),
-                 rep("sum of eggs laid [n]",nrow(ddf)/3))
+                 rep("sum of eggs released [n]",nrow(ddf)/3))
 
 ggplot(ddf,aes(x=chla_supply,y=value,fill=species)) +
   geom_boxplot() +
@@ -201,203 +210,83 @@ ggplot(ddf,aes(x=chla_supply,y=value,fill=species)) +
   facet_wrap(measure~.,
              scales="free_y",
              ncol=3) +
-  labs(x="",y="") +
+  labs(x="chorophyll a",y="") +
   theme(legend.text=element_text(size=12))
 
 # export this plot as PDF file
-# ggsave("figures/experiments-differences.pdf",width=7,height=6)
-ggsave("figures/experiments-differences.pdf",width=9,height=4)
+# ggsave("figures/experiments-differences.tiff",width=9,height=4,dpi=800)
+ggsave("figures/experiments-differences.tiff",width=16,height=7.5,units="cm",dpi=800)
 
 # delete everything
 rm(list=ls())
 dev.off()
 
-# all together -----------------------------------------------------------
+# plot impact salps ----------------------------------------------------
 
 # set working directory accordingly
-setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
+setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/figures/")
 
-# import trimmed data frame
-df <- read.csv("output/PEKRIS-population-trimmed.csv")
+# load packages
+library("terra")
+library("viridis")
 
-# filter runs of interest (after 12 years of transient phase, 
-# variable chl a and both species present)
-df <- df[df$year>12 & df$chla_supply!="Const" & df$species=="both",]
+# import PEKRIS snapshot as raster file
+# get names of all available files
+temp <- list.files(pattern=".asc")
 
-# load ggplot
-library("ggplot2") 
+# load all raster files into one list
+datalist = lapply(temp, rast) 
 
-# set black white theme
-theme_set(theme_bw())
+# remove file extension
+temp <- substr(temp,1,nchar(temp)-4)
 
-# set black labels
-theme_update(axis.text.x = element_text(colour="black"),
-             axis.text.y = element_text(colour="black"),
-             plot.title = element_text(hjust = 0.5),
-             panel.border = element_rect(colour = "black", fill=NA, size=0.6),
-             legend.position="top")
+# give the data its corresponding names
+names(datalist) <- temp
 
-# load tidyr + scales
-library("tidyr") 
-library("scales") 
+rm(temp) # delete names
 
-# classify chl a and max abundance salps into three levels each
-b <- df$max_chla_density
-a <- quantile(b,probs=c(1/3,2/3,1))
-df$max_chla_density <- sapply(b, function(x){
-  ifelse(x<=a[1],a[1],
-         ifelse(x<=a[2],a[2],a[3]))
-})
+# calculate chl a reduction based on max chl a value
+for (i in 1:length(datalist)) {
+  m1 <- max(values(datalist[[i]]))
+  datalist[[i]] <- (datalist[[i]] - m1) / m1 * 100
+  rm(m1)
+}
 
-b <- df$max_abundance_salp_season
-a <- quantile(b,probs=c(1/3,2/3,1),na.rm=T)
+# convert to data frame for plotting
+datalist <- lapply(datalist,as.data.frame,xy=T)
 
-df$max_abundance_salp_season <- sapply(b, function(x){
-  ifelse(x<=a[1],a[1],
-         ifelse(x<=a[2],a[2],a[3]))
-})
+# create column with salp abundance
+for (i in 1:length(datalist)) {
+  datalist[[i]][,4] <- as.numeric(names(datalist)[i])
+}
 
-# round levels
-df$max_chla_density <- round(df$max_chla_density,digits=3)
-df$max_abundance_salp_season <- round(df$max_abundance_salp_season,digits=0)
+# rename columns of data frame 1
+colnames(datalist[[1]]) <- c("x","y","chla","abundance")
 
-# calculate mean of krill outputs for each level combination
-d2 <- aggregate(cbind(abundance_krill,mean_length_krill,sum_eggs_krill)~max_chla_density+max_abundance_salp_season,df,mean)
+# rename column names
+for (i in 2:length(datalist)) {
+  colnames(datalist[[i]]) <- colnames(datalist[[1]])
+}
 
-# convert to factors
-d2$max_chla_density <- as.factor(d2$max_chla_density)
-d2$max_abundance_salp_season <- as.factor(d2$max_abundance_salp_season)
+# delete i
+rm(i)
 
-# change table from wide to long format
-d2 <- gather(d2,key="measure",value="value",c("abundance_krill","mean_length_krill","sum_eggs_krill"))
+# create empty data frame
+df <- data.frame(NULL)
 
-# create column with levels low, moderate and high for discrete color levels
-b <- d2[d2$measure=="abundance_krill",4]
-a <- quantile(b,probs=c(1/3,2/3,1))
-b1 <- sapply(b, function(x){
-  ifelse(x<=a[1],"low",
-         ifelse(x<=a[2],"moderate","high"))
-})
-
-b <- d2[d2$measure=="mean_length_krill",4]
-a <- quantile(b,probs=c(1/3,2/3,1))
-b2 <- sapply(b, function(x){
-  ifelse(x<=a[1],"low",
-         ifelse(x<=a[2],"moderate","high"))
-})
-
-b <- d2[d2$measure=="sum_eggs_krill",4]
-a <- quantile(b,probs=c(1/3,2/3,1))
-b3 <- sapply(b, function(x){
-  ifelse(x<=a[1],"low",
-         ifelse(x<=a[2],"moderate","high"))
-})
-
-d2$levels <- c(b1,b2,b3)
-d2$levels <- as.factor(d2$levels)
-d2$levels <- factor(d2$levels,levels=c("low", "moderate", "high"))
-
-# round values
-d2[d2$measure=="abundance_krill",4] <- round(d2[d2$measure=="abundance_krill",4],digits=0)
-d2[d2$measure=="mean_length_krill",4] <- round(d2[d2$measure=="mean_length_krill",4],digits=1)
-d2[d2$measure=="sum_eggs_krill",4] <- round(d2[d2$measure=="sum_eggs_krill",4],digits=0)
-
-# create tile plot
-ggplot(d2,aes(x=max_chla_density,y=max_abundance_salp_season)) +
-  geom_tile(aes(fill=levels)) +
-  geom_text(aes(label=round(value,1),col=levels)) +
-  scale_fill_viridis_d(option="D") +
-  scale_color_manual(values=c("white","black","black"),name=NULL,labels=NULL,breaks=NULL) +
-  facet_wrap(.~measure)
-
-ggsave("figures/experiments-both-togethter.pdf",width=9,height=4)
-
-# delete everything
-rm(list=ls())
-dev.off()
-
-# OLD: salps: time series ------------------------------------------------------
-
-# set working directory accordingly
-setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
-
-# import trimmed data frame
-df <- read.csv("output/PEKRIS-population-trimmed.csv")
-
-# remove years without data
-df <- df[!is.na(df$max_abundance_salp_season),]
-
-# load library for plotting
-library("ggplot2")
-
-# set black white theme
-theme_set(theme_bw())
-
-# set black labels
-theme_update(axis.text.x = element_text(colour="black"),
-             axis.text.y = element_text(colour="black"),
-             plot.title = element_text(hjust = 0.5),
-             panel.border = element_rect(colour = "black", fill=NA, size=0.6),
-             legend.position="bottom")
-
-# load tidyr
-library("tidyr")
-
-# change table from wide to long format
-ddf <- gather(df,key="measure",value="value",c("max_abundance_salp_season","median_abundance_salp_overall"))
-
-# add maximum of each output as own column
-ddf$maximum <- c(rep(max(df$max_abundance_salp_season),nrow(ddf)/2),
-                 rep(max(df$median_abundance_salp_overall),nrow(ddf)/2))
-
-# calculate max chl a densities scaled to the maximum of each output
-ddf$max_chla_density <- ddf$max_chla_density * ddf$maximum / max(df$max_chla_density)
-
-# rename parameter values for plotting
-ddf[ddf$chla_supply=="Const",2] <- "constant max chlorophyll a density"
-ddf[ddf$chla_supply=="Lognorm",2] <- "varying max chlorophyll a density"
-ddf[ddf$measure=="max_abundance_salp_season",8] <- "max peak abundance [n] salp"
-ddf[ddf$measure=="median_abundance_salp_overall",8] <- "median abundance [n] salp"
-ddf[ddf$species=="both",1] <- "salps & krill"
-ddf[ddf$species=="krill",1] <- "krill only"
-
-library("scales")
-
-# plot all together
-ggplot(ddf[ddf$species=="salps & krill",],aes(x=year,value)) +
-  geom_ribbon(aes(x=year,ymax=max_chla_density,ymin=0,alpha=0.5),col="green4",fill="green4") +
-  geom_line() +
-  theme(strip.background = element_blank(),
-        strip.placement = "outside") +
-  scale_y_continuous("model output",
-                     labels=comma,
-                     sec.axis=sec_axis(~./max(.)*max(df$max_chla_density),
-                                       name="max chl a density [mg / m3]")) +
-  facet_grid(measure~chla_supply,scales="free_y",switch="y") +
-  labs(x="year") +
-  scale_alpha(labels="chlorophyll a density") +
-  guides(alpha=guide_legend(title=NULL),
-         linetype=guide_legend(title=NULL))
-
-# export this plot as PDF file
-ggsave("figures/experiments-both-salps.pdf",width=6,height=5)  
+# combine all into one data frame
+for (i in 1:length(datalist)) {
+  if(i==1){df <- datalist[[i]]}
+  if(i>=2){df <- rbind(df,datalist[[i]])}
+}
 
 # delete obsolete data
-rm(list=ls())
-dev.off()
+rm(datalist)
 
-# OLD: krill: time series ---------------------------------------
+# create factor
+df$abundance <- as.factor(df$abundance)
+levels(df$abundance) <- c("1,000 salps","2,000 salps","7,000 salps","15,000 salps","30,000 salps","50,000 salps")
 
-# set working directory accordingly
-setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
-
-# import trimmed data frame
-df <- read.csv("output/PEKRIS-population-trimmed.csv")
-
-# delete first 12 years as transient phase
-df <- df[df$year>12,]
-
-# load library for plotting
 library("ggplot2")
 
 # set black white theme
@@ -410,47 +299,13 @@ theme_update(axis.text.x = element_text(colour="black"),
              panel.border = element_rect(colour = "black", fill=NA, size=0.6),
              legend.position="bottom")
 
-# load tidyr
-library("tidyr")
+ggplot(df,aes(x=x,y=y,fill=chla)) +
+  geom_raster() +
+  facet_wrap(.~abundance,ncol=2) +
+  scale_fill_continuous(type="viridis") +
+  labs(fill="chl a reduction [%]")
 
-# change table from wide to long format
-ddf <- gather(df,key="measure",value="value",c("abundance_krill","mean_length_krill","sum_eggs_krill"))
-
-# add maximum of each output as own column
-ddf$maximum <- c(rep(max(df$abundance_krill),nrow(ddf)/3),rep(max(df$mean_length_krill),nrow(ddf)/3),rep(max(df$sum_eggs_krill),nrow(ddf)/3))
-
-# calculate max chl a densities scaled to the maximum of each output
-ddf$max_chla_density <- ddf$max_chla_density * ddf$maximum / max(df$max_chla_density)
-
-# rename parameter values for plotting
-ddf[ddf$chla_supply=="Const",2] <- "constant max chlorophyll a density"
-ddf[ddf$chla_supply=="Lognorm",2] <- "varying max chlorophyll a density"
-ddf[ddf$measure=="abundance_krill",7] <- "abundance [n] krill"
-ddf[ddf$measure=="mean_length_krill",7] <- "mean length [mm] krill"
-ddf[ddf$measure=="sum_eggs_krill",7] <- "sum of eggs layed [n]"
-ddf[ddf$species=="both",1] <- "salps & krill"
-ddf[ddf$species=="krill",1] <- "krill only"
-
-library("scales")
-
-# plot all together
-ggplot(ddf,aes(x=year,value)) +
-  geom_ribbon(aes(x=year,ymax=max_chla_density,ymin=0,alpha=0.5),col="green4",fill="green4") +
-  geom_line(aes(linetype=species),na.rm=T) +
-  theme(strip.background = element_blank(),
-        strip.placement = "outside") +
-  scale_y_continuous("model output",
-                     labels=comma,
-                     sec.axis=sec_axis(~./max(.)*max(df$max_chla_density),
-                                       name="max chl a density [mg / m3]")) +
-  facet_grid(measure~chla_supply,scales="free_y",switch="y") +
-  labs(x="year") +
-  scale_alpha(labels="chlorophyll a density") +
-  guides(alpha=guide_legend(title=NULL),
-         linetype=guide_legend(title=NULL))
-
-# export this plot as PDF file
-ggsave("figures/experiments-both.pdf",width=6,height=8)
+ggsave("salp-impact.tiff",width=16,height=21,units="cm",dpi=800)
 
 # delete everything
 rm(list=ls())
