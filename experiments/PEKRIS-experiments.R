@@ -1,21 +1,20 @@
 # data processing ---------------------------------------------------------
 
 # set working directory accordingly
+# setwd("C:/Users/Bruno/Nextcloud/PEKRIS/013-experiments/")
 setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
 
 # import simulation results
-df1 <- read.csv("output/PEKRIS-population1.csv",skip=6)
-df2 <- read.csv("output/PEKRIS-population2.csv",skip=6)
-df3 <- read.csv("output/PEKRIS-population3.csv",skip=6)
-
-# combine data frames
-df <- rbind(df1,df2,df3)
-
-# delete obsolete data
-rm(df1,df2,df3)
+df <- read.csv("output/PEKRIS-population.csv",skip=6)
 
 # convert krill structural length to real length in mm
 df$mean_length_krill <- df$mean_length_krill / 0.2
+
+# calculate densities of krill and salps
+df$density_krill <- df$abundance_krill / (51 * 51 * 16) * 1000
+df$density_salps <- df$max_abundance_salp_season / (51 * 51 * 16) * 1000
+
+max(df$density_salps)
 
 # change steps to factor
 df$X.step. <- as.factor(df$X.step.)
@@ -33,20 +32,20 @@ df1 <- df[df$X.step. %in% seq(180,220*180,365),]
 df$year <- floor(df$X.step./365) + 1
 df1$year <- floor(df1$X.step./365)
 
-# calculate mean of repetitions and years
-df2 <- aggregate(cbind(abundance_krill,mean_length_krill,sum_eggs_krill,max_chla_density)~species+chla_supply+year,df,mean)
+# calculate median of repetitions and years
+df2 <- aggregate(cbind(density_krill,mean_length_krill,sum_eggs_krill,max_chla_density)~species+chla_supply+year,df,mean)
 
-# calculate mean and max of salp abundances
-df1 <- aggregate(cbind(max_abundance_salp_season,median_abundance_salp_overall)~species+chla_supply+year,df1,mean)
+# calculate median and max of salp abundances
+df1 <- aggregate(cbind(density_salps,median_abundance_salp_overall)~species+chla_supply+year,df1,mean)
 
 # remove incomplete last year
 df2 <- df2[df2$year<101,]
 
 # combine data frames inserting NA for incomplete last year
 df2$median_abundance_salp_overall <- c(df1$median_abundance_salp_overall[7:606])
-df2$max_abundance_salp_season <- c(df1$max_abundance_salp_season[7:606])
-
+df2$density_salps <- c(df1$density_salps[7:606])
 # calculate number of produced eggs by krill per year
+
 dl <- split(df2,f=list(df2$species,df2$chla_supply))
 
 for (i in 1:length(dl)) {
@@ -54,13 +53,19 @@ for (i in 1:length(dl)) {
   b <- c(0,a)
   a <- c(a,0)
   ab <- a - b
-  ab <- ab[1:50]
+  ab <- ab[1:100]
   dl[[i]][,6] <- ab
 }
 
 df2 <- dl[[1]]
 
 for (i in 2:length(dl)) {df2 <- rbind(df2,dl[[i]])}
+
+# remove transient phase (first 30 years)
+df2 <- df2[df2$year>=30,]
+
+# calculate krill egg density
+df2$sum_eggs_krill <- df2$sum_eggs_krill / (51 * 51 * 16) * 1000
 
 # safe data frame 
 write.csv(df2,"output/PEKRIS-population-trimmed.csv",row.names=F)
@@ -72,6 +77,7 @@ dev.off()
 # time series ---------------------------------------
 
 # set working directory accordingly
+# setwd("C:/Users/Bruno/nextcloud/PEKRIS/013-experiments/")
 setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
 
 # import trimmed data frame
@@ -87,61 +93,62 @@ theme_set(theme_bw())
 theme_update(axis.text.x = element_text(colour="black"),
              axis.text.y = element_text(colour="black"),
              plot.title = element_text(hjust = 0.5),
-             panel.border = element_rect(colour = "black", fill=NA, size=0.6),
+             panel.border = element_rect(colour = "black", fill=NA),
              legend.position="bottom")
 
 # load tidyr
 library("tidyr")
 
 # change table from wide to long format
-# ddf <- gather(df,key="measure",value="value",c("abundance_krill","mean_length_krill","sum_eggs_krill"))
-ddf <- gather(df,key="measure",value="value",c("abundance_krill","mean_length_krill","sum_eggs_krill","max_abundance_salp_season"))
+ddf <- gather(df,
+              key="measure",
+              value="value",
+              c("density_krill","mean_length_krill","sum_eggs_krill","density_salps"))
 
 # add maximum of each output as own column
-# ddf$maximum <- c(rep(max(df$abundance_krill),nrow(ddf)/3),rep(max(df$mean_length_krill),nrow(ddf)/3),rep(max(df$sum_eggs_krill),nrow(ddf)/3))
-ddf$maximum <- c(rep(max(df$abundance_krill),nrow(ddf)/4),
+ddf$maximum <- c(rep(max(df$density_krill),nrow(ddf)/4),
                  rep(max(df$mean_length_krill),nrow(ddf)/4),
                  rep(max(df$sum_eggs_krill),nrow(ddf)/4),
-                 rep(max(df$max_abundance_salp_season,na.rm=T),nrow(ddf)/4))
+                 rep(max(df$density_salps),nrow(ddf)/4))
 
 # calculate max chl a densities scaled to the maximum of each output
 ddf$max_chla_density <- ddf$max_chla_density * ddf$maximum / max(df$max_chla_density)
 
 library("scales")
 
-ddf[ddf$species=="krill"&ddf$measure=="max_abundance_salp_season",c(7,8)] <- NA
+ddf[ddf$species=="krill"&ddf$measure=="density_salps",c(7,8)] <- NA
 
 ddf$measure <- as.factor(ddf$measure)
-levels(ddf$measure) <- c("abundance_krill [n]","max_abundance_salp [n]",
-                         "mean_length_krill [mm]","sum_eggs_krill [n]")
+levels(ddf$measure) <- c("krill density [n / 1000 m3]","salp density [n / 1000 m3]",
+                         "krill mean length [mm]","krill eggs density [n / 1000 m3]")
 
-ddf$measure <- factor(ddf$measure,levels=c("abundance_krill [n]",
-                                           "mean_length_krill [mm]",
-                                           "sum_eggs_krill [n]",
-                                           "max_abundance_salp [n]"))
+ddf$measure <- factor(ddf$measure,levels=c("krill density [n / 1000 m3]",
+                                           "krill mean length [mm]",
+                                           "krill eggs density [n / 1000 m3]",
+                                           "salp density [n / 1000 m3]"))
 
 ddf$species <- as.factor(ddf$species)
 levels(ddf$species) <- c("krill & salps","krill only","salps only")
 
 # plot all together
-ggplot(ddf[ddf$year>=30,],aes(x=year,value)) +
+ggplot(ddf,aes(x=year,value)) +
   geom_ribbon(aes(x=year,ymax=max_chla_density,ymin=0,alpha=0.5),col="green4",fill="green4") +
   geom_line(aes(linetype=species),na.rm=T) +
   theme(strip.background = element_blank(),
         strip.placement = "outside") +
   scale_y_continuous("model output",
                      labels=comma,
-                     sec.axis=sec_axis(~./max(.)*max(df$max_chla_density),
-                                       name="max chl a density [mg / m3]")) +
+                     sec.axis=sec_axis(~./max(.,na.rm=T)*max(df$max_chla_density),
+                                       name=expression(paste("max chl ",italic("a")," concentration [mg / m3]")))) +
   facet_grid(measure~chla_supply,scales="free_y",switch="y") +
   labs(x="year") +
-  scale_alpha(labels="chlorophyll a density") +
+  scale_alpha(labels="chlorophyll a concentration") +
   guides(alpha=guide_legend(title=NULL),
          linetype=guide_legend(title=NULL))
 
 # export this plot as PDF file
 # ggsave("figures/experiments-both.tiff",width=7,height=10,dpi=800)
-ggsave("C:/Users/Bruno/ownCloud/PEKRIS/015-manuscript1/Fig2.tiff",width=16,height=22,units="cm",dpi=800)
+ggsave("C:/Users/Bruno/ownCloud/PEKRIS/015-manuscript1/revision1/Fig3.tiff",width=16,height=22,units="cm",dpi=250)
 
 # delete everything
 rm(list=ls())
@@ -150,42 +157,39 @@ dev.off()
 # test for differences ----------------------------------------------------
 
 # set working directory accordingly
+# setwd("C:/Users/Bruno/nextcloud/PEKRIS/013-experiments/")
 setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
+
+# load libraries
+library("tidyr")
 
 # import simulation results
 df <- read.csv("output/PEKRIS-population-trimmed.csv")
-
-# remove transient phase (first 30 years)
-df <- df[df$year>=30,]
 
 # split data
 df1 <- df[df$species!="salps",]
 df2 <- df[df$species!="krill",]
 
 # test for normal distribution of data
-aggregate(cbind(abundance_krill,mean_length_krill,sum_eggs_krill)~species+chla_supply,
+aggregate(cbind(density_krill,mean_length_krill,sum_eggs_krill)~species+chla_supply,
           df1,
           function(x) shapiro.test(x)$p.value)
 
 # test for normal distribution of data
-aggregate(max_abundance_salp_season~species+chla_supply,
+aggregate(cbind(density_salps)~species+chla_supply,
           df2,
           function(x) shapiro.test(x)$p.value)
 
-# Scheirer-Ray-Hare test for krill abundance
-df1$rk1 <- rank(df1$abundance_krill) # transform data into ranks
+# Scheirer-Ray-Hare test for krill density
+df1$rk1 <- rank(df1$density_krill) # transform data into ranks
 dd = anova(lm(rk1~species*chla_supply,df1)) # perform anova of ranks
 ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # calculate total sq
 dd$`F value` = c(dd$`Sum Sq`[c(1:3)] / ddsum,NA) # divide total sq by sum sq
 dd$`Pr(>F)` = 1 - pchisq(dd$`F value`,1) # chi sq test
 dd
 
-# Scheirer-Ray-Hare test for mean length of krill
-df1$rk2 <- rank(df1$mean_length_krill) # transform data into ranks
-dd = anova(lm(rk2~species*chla_supply,df1)) # perform anova of ranks
-ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # calculate total sq
-dd$`F value` = c(dd$`Sum Sq`[c(1:3)] / ddsum,NA) # divide total sq by sum sq
-dd$`Pr(>F)` = 1 - pchisq(dd$`F value`,1) # chi sq test
+# ANOVA for mean length of krill
+dd = anova(lm(mean_length_krill~species*chla_supply,df1)) # perform anova
 dd
 
 # Scheirer-Ray-Hare test for number of eggs released by krill
@@ -197,7 +201,7 @@ dd$`Pr(>F)` = 1 - pchisq(dd$`F value`,1) # chi sq test
 dd
 
 # Scheirer-Ray-Hare test for salp abundance
-df2$rk1 <- rank(df2$max_abundance_salp_season) # transform data into ranks
+df2$rk1 <- rank(df2$density_salps) # transform data into ranks
 dd = anova(lm(rk1~species*chla_supply,df2)) # perform anova of ranks
 ddsum = sum(dd$`Sum Sq`) / sum(dd$Df) # calculate total sq
 dd$`F value` = c(dd$`Sum Sq`[c(1:3)] / ddsum,NA) # divide total sq by sum sq
@@ -215,8 +219,15 @@ df1 <- df[df$species!="salps",]
 df2 <- df[df$species!="krill",]
 
 # change from wide to long format
-ddf1 <- gather(df1,key="measure",value="value",c("abundance_krill","mean_length_krill","sum_eggs_krill"))
-ddf2 <- gather(df2,key="measure",value="value","max_abundance_salp_season")
+ddf1 <- gather(df1,
+               key="measure",
+               value="value",
+               c("density_krill","mean_length_krill","sum_eggs_krill"))
+
+ddf2 <- gather(df2,
+               key="measure",
+               value="value",
+               c("density_salps"))
 
 # change species to factor
 ddf1$species <- as.factor(ddf1$species)
@@ -231,11 +242,12 @@ ddf <- rbind(ddf1[,-c(5,6)],ddf2[,-c(4:6,8)])
 
 ddf$measure <- as.factor(ddf$measure)
 
-levels(ddf$measure) <- c("abundance krill [n]","abundance salp [n]",
-                         "mean length krill [mm]","sum of eggs released [n]")
+levels(ddf$measure) <- c("density krill [n/1000m3]","density salp [n/1000m3]",
+                         "mean length krill [mm]","density krill eggs [n/1000m3]")
 
-ddf$measure <- factor(ddf$measure,levels=c("abundance krill [n]","mean length krill [mm]",
-                                           "sum of eggs released [n]","abundance salp [n]"))
+ddf$measure <- factor(ddf$measure,
+                      levels=c("density krill [n/1000m3]","mean length krill [mm]",
+                               "density krill eggs [n/1000m3]","density salp [n/1000m3]"))
 
 # load ggplot
 library("ggplot2")
@@ -248,14 +260,14 @@ theme_update(axis.text.x = element_text(colour="black"),
              axis.text.y = element_text(colour="black"),
              # text=element_text(size=9),
              plot.title = element_text(hjust = 0.5),
-             panel.border = element_rect(colour = "black", fill=NA, size=0.6),
+             panel.border = element_rect(colour = "black", fill=NA),
              legend.position="bottom")
 
-library("tidyr") # load tidyr
 library("scales") # load scales
 
 ggplot(ddf,aes(x=chla_supply,y=value,fill=species)) +
   geom_boxplot() +
+  # stat_summary(fun=mean, geom="point",size=2,shape=4,position = position_dodge2(width=0.75, preserve="single")) +
   scale_fill_manual(values=c("#E69F00","#56B4E9"),
                     labels=c("yes","no"),
                     name="competition present?") +
@@ -267,8 +279,7 @@ ggplot(ddf,aes(x=chla_supply,y=value,fill=species)) +
   theme(legend.text=element_text(size=12))
 
 # export this plot as PDF file
-# ggsave("figures/experiments-differences.tiff",width=9,height=4,dpi=800)
-ggsave("C:/Users/Bruno/ownCloud/PEKRIS/015-manuscript1/Fig3.tiff",width=16,height=14,units="cm",dpi=800)
+ggsave("C:/Users/Bruno/ownCloud/PEKRIS/015-manuscript1/revision1/Fig4.tiff",width=16,height=14,units="cm",dpi=300)
 
 # delete everything
 rm(list=ls())
@@ -277,13 +288,11 @@ dev.off()
 # calculate medians -------------------------------------------------------
 
 # set working directory accordingly
+# setwd("C:/Users/Bruno/nextcloud/PEKRIS/013-experiments/")
 setwd("C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/")
 
 # import simulation results
 df <- read.csv("output/PEKRIS-population-trimmed.csv")
-
-# remove first 30 years of transient phase
-df <- df[df$year>=30,]
 
 # split data frame
 dl <- split(df,f=list(df$species,df$chla_supply))
@@ -297,17 +306,20 @@ df0 <- data.frame("chla_supply"=c(rep("Const",3),rep("Lognorm",3)))
 # create column with species scenario
 df0$species <- rep(c("both","krill","salps"),2)
 
+str(dl[[1]])
+
 # add median of model outputs
-df0$abundance_krill <- unlist(lapply(dl,function(x){median(x[,4])}))
+df0$density_krill <- unlist(lapply(dl,function(x){median(x[,4])}))
 df0$mean_length_krill <- unlist(lapply(dl,function(x){median(x[,5])}))
 df0$sum_eggs_krill <- unlist(lapply(dl,function(x){median(x[,6])}))
-df0$max_abundance_salp_season <- unlist(lapply(dl,function(x){median(x[,9])}))
+df0$density_salps <- unlist(lapply(dl,function(x){median(x[,9])}))
 
 # view results
 df0
 
 # export results
-write.csv2(df0,"C:/Users/bruno/ownCloud/PEKRIS/013-experiments/output/medians.csv",row.names=F)
+# write.csv2(df0,"C:/Users/bruno/nextcloud/PEKRIS/015-manuscript1/revision1/medians.csv",row.names=F)
+write.csv2(df0,"C:/Users/bruno/ownCloud/PEKRIS/015-manuscript1/revision1/medians.csv",row.names=F)
 
 # delete everything
 rm(list=ls())
@@ -331,18 +343,13 @@ datalist = lapply(temp, rast)
 
 # remove file extension
 temp <- substr(temp,1,nchar(temp)-4)
-
-# give the data its corresponding names
-names(datalist) <- temp
-
+a <- substr(temp,1,nchar(temp)-3)
+b <- substr(temp,nchar(temp)-1,nchar(temp))
+  
 rm(temp) # delete names
 
-# calculate chl a reduction based on max chl a value
-for (i in 1:length(datalist)) {
-  m1 <- max(values(datalist[[i]]))
-  datalist[[i]] <- (datalist[[i]] - m1) / m1 * 100
-  rm(m1)
-}
+# give the data its corresponding names
+names(datalist) <- a
 
 # convert to data frame for plotting
 datalist <- lapply(datalist,as.data.frame,xy=T)
@@ -360,6 +367,7 @@ for (i in 2:length(datalist)) {
   colnames(datalist[[i]]) <- colnames(datalist[[1]])
 }
 
+
 # delete i
 rm(i)
 
@@ -375,16 +383,16 @@ for (i in 1:length(datalist)) {
 # delete obsolete data
 rm(datalist)
 
+# normalize maximum chl a to 0 % reduction
+df$chla <- df$chla + 20
+
 # create factor
 df$abundance <- as.factor(df$abundance)
-levels(df$abundance) <- c("1,000 salps","3,000 salps","7,000 salps","20,000 salps")
 
 library("ggplot2")
 
 # set black white theme
 theme_set(theme_bw())
-
-windowsFonts()
 
 # set black labels
 theme_update(axis.text.x = element_text(colour="black"),
@@ -392,15 +400,26 @@ theme_update(axis.text.x = element_text(colour="black"),
              text=element_text(family="sans"),
              plot.title = element_text(hjust = 0.5),
              panel.border = element_rect(colour = "black", fill=NA, size=0.6),
-             legend.position="bottom")
+             legend.position="right")
+
+levels(df$abundance) <- c(paste("6,735 salps per 1,000 m3 on day",b[4]),
+                          paste("10,668 salps per 1,000 m3 on day",b[1]),
+                          paste("17,099 salps per 1,000 m3 on day",b[2]),
+                          paste("20,015 salps per 1,000 m3 on day",b[3]))
 
 ggplot(df,aes(x=x,y=y,fill=chla)) +
   geom_raster() +
-  facet_wrap(.~abundance,ncol=1) +
+  facet_wrap(.~abundance,ncol=2) +
   scale_fill_gradient(low="black",high="green3") +
-  labs(fill="chl a reduction [%]")
+  labs(fill="chl a \nreduction\n[%]",
+       x="x coordinate",
+       y="y coordinate")
 
-ggsave("C:/Users/Bruno/ownCloud/PEKRIS/015-manuscript1/Fig1.tiff",width=8,height=21,units="cm",dpi=800)
+ggsave("C:/Users/Bruno/ownCloud/PEKRIS/015-manuscript1/revision1/Fig2.tiff",
+       width=16,
+       height=12,
+       units="cm",
+       dpi=800)
 
 # delete everything
 rm(list=ls())
