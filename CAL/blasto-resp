@@ -1,7 +1,0 @@
-+ varyied blasto_resp between 1 and 20
-+ all other parameters were fixed for their standard values
-+ chl_supply = Const & Lognorm
-+ species = salps
-+ results: 
-	- above 6.732 the maximum reported length of blastozoids is not exceeded (6 cm)
-	- setting blasto_resp reference value to 7.5 %
