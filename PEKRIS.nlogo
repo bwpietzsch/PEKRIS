@@ -10,7 +10,7 @@ breed [chains chain]           ; chains are chains of femlae blastozoids
 breed [krills krill]           ; krill modelled individually
 breed [clutches clutch]        ; eggs and early stages modelled as cohorts to reduce computational effort
 
-patches-own [chla]
+patches-own [chla chla2]
 
 globals [
   list_growth_rate_oozoid         ; list where growth rates of oozoids are stored
@@ -133,6 +133,11 @@ to setup
     let SAspan (2 * SArange) ; define parameter range for SA
 
     ; for each parameter, select a random value between min (SAmin) and max (min + SAspan)
+    ifelse (random 2 = 1) [
+      set chla_supply "Lognorm"
+    ][
+      set chla_supply "Const"
+    ]
     set chla_growth precision (SAmin * 0.25 + random-float (SAspan * 0.25)) 3
     set chla_decay precision (SAmin * 0.05 + random-float (SAspan * 0.05)) 4
     set vegetation_delay (precision (SAmin * 45) 0 + random precision (SAspan * 45) 0)
@@ -141,13 +146,14 @@ to setup
     set salp_amount (SAmin * 10 + random (SAspan * 10 + 1))
     set salp_length (precision (SAmin * 3 + random-float (SAspan * 3)) 1)
     set salp_starvation (SAmin * 30 + random (SAspan * 30 + 1))
-    set salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)
+    set salp_mortality (precision (SAmin * 0.1 + random-float (SAspan * 0.1)) 2)
     set oozoid_respiration (precision (SAmin * 3.7 + random-float (SAspan * 3.7)) 2)
-    set blastozoid_respiration (precision (SAmin * 7.5 + random-float (SAspan * 7.5)) 2)
+    set blastozoid_respiration (precision (SAmin * 7.5 + random-float (SAspan * 3.5)) 2)
     set krill_halfsat precision (SAmin * 0.09 + random-float (SAspan * 0.09)) 3
     set krill_amount (SAmin * 30 + random (SAspan * 30 + 1))
     set krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)
     set krill_hibernation (precision (SAmin * 20 + random-float (SAspan * 20)) 1)
+    set salp_grazing (precision (SAmin * 0.0025 + random-float (SAspan * 0.0025)) 5)
   ]
 
   set monthlycount [0 0 0 0 0 0 0 0 0 0 0 0] ; here the intraannual distribution of salp abundances will be stored
@@ -269,15 +275,15 @@ to grow
     let fr_k (chla / resolution) / ( (chla / resolution) + krill_halfsat)
 
     ask oozoids-here [
-      set need (need + T_factor_salp * number * (0.0025 * fr_s * body_length ^ 2)) ; for oozoids number is always one, the uptake of food depends on the squared body length
+      set need (need + T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2)) ; for oozoids number is always one, the uptake of food depends on the squared body length
     ]
 
     ask blastozoids-here [
-      set need (need + T_factor_salp * number * (0.0025 * fr_s * body_length ^ 2)) ; for blastozoids number is always one, the uptake of food depends on the squared body length
+      set need (need + T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2)) ; for blastozoids number is always one, the uptake of food depends on the squared body length
     ]
 
     ask chains-here [
-      set need (need + T_factor_salp * number * (0.0025 * fr_s * body_length ^ 2)) ; for chains number can vary, since number represents the number of blastozoids in the chain
+      set need (need + T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2)) ; for chains number can vary, since number represents the number of blastozoids in the chain
     ]
 
     ; potential food uptake for krill
@@ -310,12 +316,12 @@ to grow
 
     ; growth of oozoids
     ask oozoids-here [
-      let carbon_assimilated (T_factor_salp * fr_s * 0.0025 * body_length ^ 2 * 0.64 * 50)      ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
+      let carbon_assimilated (T_factor_salp * fr_s * salp_grazing * body_length ^ 2 * 0.64 * 50)      ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
       let carbon_growth (0.85 * carbon_assimilated)                                   ; 85% of the carbon is allocated to growth
       let carbon_reproduction_local (0.15 * carbon_assimilated)                              ; 15% of the carbon is allocated to reproduction
       let oldl body_length
       let starvationlocal false
-      set chla (chla - T_factor_salp * number * (0.0025 * fr_s * body_length ^ 2))         ; reduction of the overall available chla in the patch
+      set chla (chla - T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2))         ; reduction of the overall available chla in the patch
       let carbon_respiration (T_factor_salp * oozoid_respiration / 100 * carbon_weight)         ; respiration costs based on carbon weight (Iguchi 2004)
       ifelse (carbon_respiration > carbon_growth) [                                   ; if respiration is higher than carbon allocated to growth
         ; if respiration can be covered by assimilated carbon
@@ -351,12 +357,12 @@ to grow
 
     ; growth of blastozoids
     ask blastozoids-here [
-      let carbon_assimilated T_factor_salp * fr_s * 0.0025 * body_length ^ 2 * 0.64 * 50       ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
+      let carbon_assimilated T_factor_salp * fr_s * salp_grazing * body_length ^ 2 * 0.64 * 50       ; this is assumed to be the assimilated carbon assuming a C:Chla ratio of 50
       let carbon_growth (0.8 * carbon_assimilated)                                   ; 85% of the carbon is allocated to growth
       let carbon_reproduction_local (0.2 * carbon_assimilated)                              ; 15% of the carbon is allocated to reproduction
       let oldl body_length
       let starvationlocal false
-      set chla (chla - T_factor_salp * number * (0.0025 * fr_s * body_length ^ 2))        ; reduction of the overall available chla in the patch
+      set chla (chla - T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2))        ; reduction of the overall available chla in the patch
       let carbon_respiration (T_factor_salp * blastozoid_respiration / 100 * carbon_weight)        ; respiration costs based on carbon weight (Iguchi 2004)
       ifelse (carbon_respiration > carbon_growth) [                                  ; if respiration is higher than carbon allocated to growth
         ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local) [                ; if respiration is higher than the carbon allocated to growth and the carbon_storage_reproduction the animal starves
@@ -388,12 +394,12 @@ to grow
 
     ; growth of chains
     ask chains-here [
-      let carbon_assimilated (T_factor_salp * fr_s * 0.0025 * body_length ^ 2 * 0.64 * 50)
+      let carbon_assimilated (T_factor_salp * fr_s * salp_grazing * body_length ^ 2 * 0.64 * 50)
       let carbon_growth (0.85 * carbon_assimilated)
       let carbon_reproduction_local (0.15 * carbon_assimilated)
       let oldl body_length
       let starvationlocal false
-      set chla (chla - T_factor_salp * number * (0.0025 * fr_s * body_length ^ 2))
+      set chla (chla - T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2))
       let carbon_respiration (T_factor_salp * blastozoid_respiration / 100 * carbon_weight)
       ifelse (carbon_respiration > carbon_growth) [                                       ; if respiration is higher than carbon allocated to growth
         ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local) [                     ; if respiration is higher than the carbon allocated to growth and the carbon_storage_reproduction the animal starves
@@ -751,21 +757,21 @@ to death
 
   ask oozoids [
     set age (age + 1)
-    if (age > 450 or number_of_chain_releases = 5) [die]
+    if (age > 360 or number_of_chain_releases = 5) [die]
     if (days_of_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask blastozoids [
     set age (age + 1)
-    if (age > 150) [die]
+    if (age > 180) [die]
     if (days_of_starvation > salp_starvation) [die]
     if (random-float 1 < (salp_mortality / 100)) [die]
   ]
 
   ask chains [
     set age (age + 1)
-    if (age > 150) [die]
+    if (age > 180) [die]
     if (days_of_starvation > salp_starvation) [die]
     let counter 0
     if (number > 0) [
@@ -960,15 +966,18 @@ to calculate_global_results
     set max_time_of_immigration_salp time_of_immigration_salp
   ]
 
-  if (count krills > 0) [
+  set abundance_krill 0
+  set mean_length_krill 0
+
+  if (count krills with [body_length > (11 * 0.2)] > 0) [
     ; calculate max spawning events
     set max_spawnings_krill max (list max_spawnings_krill (max [number_of_spawnings] of krills))
 
-    ; calculate current abundance
-    set abundance_krill (count krills)
+    ; calculate current abundance of post larvae krill
+    set abundance_krill (count krills with [body_length > (11 * 0.2)])
 
     ; calc mean size
-    set mean_length_krill (precision (mean [body_length] of krills) 2)
+    set mean_length_krill (precision (mean [body_length] of krills with [body_length > (11 * 0.2)]) 2)
 
   ]
 
@@ -999,7 +1008,7 @@ end
 
 to update_plots
 
-  stop
+  ;stop
   set-current-plot "Salp abundances"
   set-current-plot-pen "Aggregates"
   plotxy (ticks) abundance_blastozoid_day
@@ -1012,25 +1021,26 @@ to update_plots
 
   set-current-plot "Krill abundances"
   set-current-plot-pen "Krill"
-  plotxy (ticks) (count krills)
+  plotxy (ticks) (abundance_krill)
 
 end
 
 to export_raster
   gis:set-world-envelope (list min-pxcor max-pxcor min-pycor max-pycor)
-  let export-raster gis:patch-dataset chla
-  let nsalps (count oozoids + count blastozoids + sum [number] of chains)
-  gis:store-dataset export-raster (word "C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/figures/" nsalps ".asc")
+  ask patches [set chla2 (chla / (max_chla_density * resolution) * 100 - 100)]
+  let export-raster gis:patch-dataset (chla2)
+  let nsalps (precision ((count oozoids + count blastozoids + sum [number] of chains) / (count patches * 16) * 1000) 0 )
+  gis:store-dataset export-raster (word "C:/Users/Bruno/ownCloud/PEKRIS/013-experiments/figures/" nsalps "_" day_of_year ".asc")
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 470
 10
-882
-423
+886
+427
 -1
 -1
-4.0
+8.0
 1
 10
 1
@@ -1041,9 +1051,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-100
+50
 0
-100
+50
 1
 1
 1
@@ -1145,7 +1155,7 @@ salp_mortality
 salp_mortality
 0
 100
-2.5
+0.1
 0.1
 1
 % / d
@@ -1172,7 +1182,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immigration_probability 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_respiration 5.0\nset blastozoid_respiration 7.5\nset salp_starvation 30\nset salp_mortality 2.5\nset krill_halfsat 0.09\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immigration_probability 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_respiration 3.7\nset blastozoid_respiration 3.5\nset salp_starvation 30\nset salp_mortality 0.1\nset salp_grazing 0.0025\nset krill_halfsat 0.09\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
 NIL
 1
 T
@@ -1348,6 +1358,7 @@ false
 "" ""
 PENS
 "Krill" 1.0 0 -16777216 true "" ""
+"pen-1" 1.0 0 -7500403 true "" ""
 
 SLIDER
 15
@@ -1373,7 +1384,7 @@ blastozoid_respiration
 blastozoid_respiration
 0
 100
-6.8
+3.5
 0.1
 1
 % / d
@@ -1663,10 +1674,36 @@ INPUTBOX
 632
 650
 seed
-1.995468574E9
+1.18445749E9
 1
 0
 Number
+
+MONITOR
+955
+515
+1012
+560
+year
+floor (ticks / 365)
+0
+1
+11
+
+SLIDER
+15
+750
+187
+783
+salp_grazing
+salp_grazing
+0
+0.01
+0.0025
+0.0001
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -2038,7 +2075,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.2.0
+NetLogo 6.2.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -2047,6 +2084,7 @@ NetLogo 6.2.0
     <setup>setup</setup>
     <go>go</go>
     <timeLimit steps="2160"/>
+    <metric>chla_supply</metric>
     <metric>vegetation_delay</metric>
     <metric>oozoid_respiration</metric>
     <metric>krill_amount</metric>
@@ -2062,87 +2100,12 @@ NetLogo 6.2.0
     <metric>krill_hibernation</metric>
     <metric>salp_halfsat</metric>
     <metric>krill_halfsat</metric>
-    <metric>max_abundance_salp_season_total</metric>
+    <metric>salp_grazing</metric>
+    <metric>max_abundance_salp_season</metric>
     <metric>median_abundance_salp_overall</metric>
-    <metric>age_of_first_reproduction</metric>
-    <metric>max_eggs_krill</metric>
-  </experiment>
-  <experiment name="k-halfsat" repetitions="1000" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2160"/>
-    <metric>krill_halfsat</metric>
+    <metric>abundance_krill</metric>
     <metric>mean_length_krill</metric>
-    <metric>max_eggs_krill</metric>
-    <metric>age_of_first_reproduction</metric>
-    <enumeratedValueSet variable="SA?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="vegetation_delay">
-      <value value="45"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="oozoid_respiration">
-      <value value="3.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_immigration_probability">
-      <value value="0.85"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_growth">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_starvation">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_amount">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_mortality">
-      <value value="2.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="krill_amount">
-      <value value="30"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="plots?">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="krill_hibernation">
-      <value value="20"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="blastozoid_respiration">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="species">
-      <value value="&quot;krill&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_decay">
-      <value value="0.05"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_length">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="salp_halfsat">
-      <value value="0.2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="krill_mortality">
-      <value value="0"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="blastozoid-respiration" repetitions="100" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2160"/>
-    <metric>blastozoid_respiration</metric>
-    <metric>max [body_length] of blastozoids</metric>
-    <metric>min [body_length] of blastozoids</metric>
-    <metric>regeneration_cycles_salp_season</metric>
-    <metric>max_regeneration_cycles_salp_season</metric>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
+    <metric>sum_eggs_krill</metric>
   </experiment>
   <experiment name="ranges" repetitions="100" sequentialRunOrder="false" runMetricsEveryStep="true">
     <setup>setup</setup>
@@ -2241,46 +2204,6 @@ NetLogo 6.2.0
       <value value="&quot;Lognorm&quot;"/>
     </enumeratedValueSet>
   </experiment>
-  <experiment name="oozoid-respiration" repetitions="100" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="2160"/>
-    <metric>oozoid_respiration</metric>
-    <metric>max [body_length] of oozoids</metric>
-    <metric>min [body_length] of oozoids</metric>
-    <metric>regeneration_cycles_salp_season</metric>
-    <metric>max_regeneration_cycles_salp_season</metric>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="salptest" repetitions="10" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="10950"/>
-    <metric>max_chla_density</metric>
-    <metric>abundance_krill</metric>
-    <metric>mean_length_krill</metric>
-    <metric>sum_eggs_krill</metric>
-    <metric>max_abundance_salp_season</metric>
-    <metric>median_abundance_salp_overall</metric>
-    <enumeratedValueSet variable="species">
-      <value value="&quot;both&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="blastozoid_respiration">
-      <value value="6.8"/>
-      <value value="7.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="oozoid_respiration">
-      <value value="1.89"/>
-      <value value="2.96"/>
-      <value value="3.7"/>
-    </enumeratedValueSet>
-  </experiment>
   <experiment name="population" repetitions="30" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
@@ -2295,63 +2218,6 @@ NetLogo 6.2.0
     <enumeratedValueSet variable="species">
       <value value="&quot;krill&quot;"/>
       <value value="&quot;both&quot;"/>
-      <value value="&quot;salps&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="population1" repetitions="30" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="36865"/>
-    <metric>seed</metric>
-    <metric>max_chla_density</metric>
-    <metric>abundance_krill</metric>
-    <metric>mean_length_krill</metric>
-    <metric>sum_eggs_krill</metric>
-    <metric>max_abundance_salp_season</metric>
-    <metric>median_abundance_salp_overall</metric>
-    <enumeratedValueSet variable="species">
-      <value value="&quot;krill&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="population2" repetitions="30" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="36865"/>
-    <metric>seed</metric>
-    <metric>max_chla_density</metric>
-    <metric>abundance_krill</metric>
-    <metric>mean_length_krill</metric>
-    <metric>sum_eggs_krill</metric>
-    <metric>max_abundance_salp_season</metric>
-    <metric>median_abundance_salp_overall</metric>
-    <enumeratedValueSet variable="species">
-      <value value="&quot;both&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="chla_supply">
-      <value value="&quot;Const&quot;"/>
-      <value value="&quot;Lognorm&quot;"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="population3" repetitions="30" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="36865"/>
-    <metric>seed</metric>
-    <metric>max_chla_density</metric>
-    <metric>abundance_krill</metric>
-    <metric>mean_length_krill</metric>
-    <metric>sum_eggs_krill</metric>
-    <metric>max_abundance_salp_season</metric>
-    <metric>median_abundance_salp_overall</metric>
-    <enumeratedValueSet variable="species">
       <value value="&quot;salps&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="chla_supply">
