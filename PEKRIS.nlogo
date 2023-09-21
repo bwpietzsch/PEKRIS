@@ -138,6 +138,16 @@ to setup
     ][
       set chla_supply "Const"
     ]
+    let nn random 3
+    ifelse (nn = 0) [
+      set species "both"
+    ][
+      ifelse (nn = 1) [
+        set species "krill"
+      ][
+        set species "salps"
+      ]
+    ]
     set chla_growth precision (SAmin * 0.25 + random-float (SAspan * 0.25)) 3
     set chla_decay precision (SAmin * 0.05 + random-float (SAspan * 0.05)) 4
     set vegetation_delay (precision (SAmin * 45) 0 + random precision (SAspan * 45) 0)
@@ -146,9 +156,7 @@ to setup
     set salp_amount (SAmin * 10 + random (SAspan * 10 + 1))
     set salp_length (precision (SAmin * 3 + random-float (SAspan * 3)) 1)
     set salp_starvation (SAmin * 30 + random (SAspan * 30 + 1))
-    set salp_mortality (precision (SAmin * 0.1 + random-float (SAspan * 0.1)) 2)
-    set oozoid_respiration (precision (SAmin * 3.7 + random-float (SAspan * 3.7)) 2)
-    set blastozoid_respiration (precision (SAmin * 7.5 + random-float (SAspan * 3.5)) 2)
+    set salp_mortality (precision (SAmin * 2.5 + random-float (SAspan * 2.5)) 2)
     set krill_halfsat precision (SAmin * 0.09 + random-float (SAspan * 0.09)) 3
     set krill_amount (SAmin * 30 + random (SAspan * 30 + 1))
     set krill_mortality (precision (SAmin * 0.07 + random-float (SAspan * 0.07)) 3)
@@ -322,32 +330,8 @@ to grow
       let oldl body_length
       let starvationlocal false
       set chla (chla - T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2))         ; reduction of the overall available chla in the patch
-      let carbon_respiration (T_factor_salp * oozoid_respiration / 100 * carbon_weight)         ; respiration costs based on carbon weight (Iguchi 2004)
-      ifelse (carbon_respiration > carbon_growth) [                                   ; if respiration is higher than carbon allocated to growth
-        ; if respiration can be covered by assimilated carbon
-        ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local) [
-          set carbon_reproduction_local (carbon_reproduction_local + carbon_growth - carbon_respiration)
-          set carbon_growth 0
-        ][; if respiration can be covered by assimilated carbon and the reproduction storage
-          ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local + carbon_storage_reproduction) [
-            set carbon_growth 0
-            set carbon_reproduction_local 0
-            set carbon_storage_reproduction (carbon_storage_reproduction + carbon_growth + carbon_reproduction_local - carbon_respiration)
-          ][; respiration loss cannot be covered at all - animal starves
-            set carbon_growth 0
-            set carbon_reproduction_local 0
-            set carbon_storage_reproduction 0
-            set starvationlocal true
-          ]
-        ]
-      ][; if respiration is less than carbon allocation to growth
-        set carbon_growth (carbon_growth - carbon_respiration)
-        if (carbon_growth < 0) [user-message "carbon-growth"]
-      ]
-      let oldcarbon_weight carbon_weight                                                        ; this is for testing
       set carbon_weight (carbon_weight + carbon_growth)                                              ; new growth
-      if (carbon_weight - oldcarbon_weight < 0 ) [user-message "carbon_weight shrinkage"]            ; salps are not allowed to shrink
-      set carbon_storage_reproduction ((1 - oozoid_respiration / 100) * carbon_storage_reproduction + carbon_reproduction_local)   ; carbon_storage_reproduction is updated - here are respiration costs for the reproductive tissue calculated - this is not done in the DEB
+      set carbon_storage_reproduction (carbon_storage_reproduction + carbon_reproduction_local)   ; carbon_storage_reproduction is updated - here are respiration costs for the reproductive tissue calculated - this is not done in the DEB
       set body_length ((17 * carbon_weight ^ 0.4) / 10)                                              ; conversion from carbon weight to body length - from an empirical relationship cited in Henschke et al. 2018
       ifelse (starvationlocal = true) [
         set days_of_starvation days_of_starvation + 1 ; increasing starvationday counter if animal could not fullfill respiration requirements
@@ -363,28 +347,8 @@ to grow
       let oldl body_length
       let starvationlocal false
       set chla (chla - T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2))        ; reduction of the overall available chla in the patch
-      let carbon_respiration (T_factor_salp * blastozoid_respiration / 100 * carbon_weight)        ; respiration costs based on carbon weight (Iguchi 2004)
-      ifelse (carbon_respiration > carbon_growth) [                                  ; if respiration is higher than carbon allocated to growth
-        ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local) [                ; if respiration is higher than the carbon allocated to growth and the carbon_storage_reproduction the animal starves
-          set carbon_reproduction_local (carbon_reproduction_local + carbon_growth - carbon_respiration)
-          set carbon_growth 0
-        ][                                                                   ; otherwise the animal does not grow and pays from the carbon_storage_reproduction
-          ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local + carbon_storage_reproduction) [
-            set carbon_growth 0
-            set carbon_reproduction_local 0
-            set carbon_storage_reproduction (carbon_storage_reproduction + carbon_growth + carbon_reproduction_local - carbon_respiration)
-          ][
-            set carbon_growth 0
-            set carbon_reproduction_local 0
-            set carbon_storage_reproduction 0
-            set starvationlocal true
-          ]
-        ]
-      ][ ; if respiration is less than carbon allocation to growth
-        set carbon_growth (carbon_growth - carbon_respiration )
-      ]
       set carbon_weight (carbon_weight + carbon_growth)
-      set carbon_storage_reproduction ((1 - blastozoid_respiration / 100) * carbon_storage_reproduction + carbon_reproduction_local)
+      set carbon_storage_reproduction (carbon_storage_reproduction + carbon_reproduction_local)
       set body_length ((17 * carbon_weight ^ 0.4) / 10)
       ifelse (starvationlocal = true) [
         set days_of_starvation (days_of_starvation + 1)
@@ -400,28 +364,8 @@ to grow
       let oldl body_length
       let starvationlocal false
       set chla (chla - T_factor_salp * number * (salp_grazing * fr_s * body_length ^ 2))
-      let carbon_respiration (T_factor_salp * blastozoid_respiration / 100 * carbon_weight)
-      ifelse (carbon_respiration > carbon_growth) [                                       ; if respiration is higher than carbon allocated to growth
-        ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local) [                     ; if respiration is higher than the carbon allocated to growth and the carbon_storage_reproduction the animal starves
-          set carbon_reproduction_local (carbon_reproduction_local + carbon_growth - carbon_respiration)
-          set carbon_growth 0
-        ][                                                                     ; otherwise the animal does not grow and pays from the carbon_storage_reproduction
-          ifelse carbon_respiration < (carbon_growth + carbon_reproduction_local + carbon_storage_reproduction) [
-            set carbon_growth 0
-            set carbon_reproduction_local 0
-            set carbon_storage_reproduction (carbon_storage_reproduction + carbon_growth + carbon_reproduction_local - carbon_respiration)
-          ][
-            set carbon_growth 0
-            set carbon_reproduction_local 0
-            set carbon_storage_reproduction 0
-            set starvationlocal true
-          ]
-        ]
-      ][                                                                       ; if respiration is less than carbon allocation to growth
-        set carbon_growth (carbon_growth - carbon_respiration)
-      ]
       set carbon_weight (carbon_weight + carbon_growth)
-      set carbon_storage_reproduction ((1 - blastozoid_respiration / 100) * carbon_storage_reproduction + carbon_reproduction_local)
+      set carbon_storage_reproduction (carbon_storage_reproduction + carbon_reproduction_local)
       set body_length ((17 * carbon_weight ^ 0.4) / 10)
       ifelse (starvationlocal = true) [
         set days_of_starvation (days_of_starvation + 1)
@@ -1155,7 +1099,7 @@ salp_mortality
 salp_mortality
 0
 100
-0.1
+2.5
 0.1
 1
 % / d
@@ -1182,7 +1126,7 @@ BUTTON
 275
 53
 ref-values
-set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immigration_probability 0.85\nset salp_amount 10\nset salp_length 3.0\nset oozoid_respiration 3.7\nset blastozoid_respiration 3.5\nset salp_starvation 30\nset salp_mortality 0.1\nset salp_grazing 0.0025\nset krill_halfsat 0.09\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
+set chla_growth 0.25\nset chla_decay 0.05\nset vegetation_delay 45\nset salp_halfsat 0.20\nset salp_immigration_probability 0.85\nset salp_amount 10\nset salp_length 3.0\nset salp_starvation 30\nset salp_mortality 2.5\nset salp_grazing 0.0025\nset krill_halfsat 0.09\nset krill_hibernation 20\nset krill_amount 30\nset krill_mortality 0.07
 NIL
 1
 T
@@ -1219,7 +1163,7 @@ CHOOSER
 chla_supply
 chla_supply
 "Const" "Lognorm"
-1
+0
 
 SLIDER
 15
@@ -1313,9 +1257,9 @@ HORIZONTAL
 
 SLIDER
 15
-625
+595
 185
-658
+628
 krill_amount
 krill_amount
 0
@@ -1328,9 +1272,9 @@ HORIZONTAL
 
 SLIDER
 15
-705
+675
 185
-738
+708
 krill_hibernation
 krill_hibernation
 0
@@ -1359,36 +1303,6 @@ false
 PENS
 "Krill" 1.0 0 -16777216 true "" ""
 "pen-1" 1.0 0 -7500403 true "" ""
-
-SLIDER
-15
-485
-185
-518
-oozoid_respiration
-oozoid_respiration
-0
-100
-3.7
-0.1
-1
-% / d
-HORIZONTAL
-
-SLIDER
-15
-525
-200
-558
-blastozoid_respiration
-blastozoid_respiration
-0
-100
-3.5
-0.1
-1
-% / d
-HORIZONTAL
 
 TEXTBOX
 190
@@ -1462,9 +1376,9 @@ half saturarion salps (Groeneveld et al. 2020)
 
 TEXTBOX
 195
-705
+675
 460
-735
+705
 reduced metabolism of adult Krill during winter; Atkinson et al. (2002): < 30 %
 12
 0.0
@@ -1492,39 +1406,19 @@ length of individuals (Groeneveld et al. 2020)
 
 TEXTBOX
 190
-625
+595
 365
-655
+625
 initial population size
-12
-0.0
-1
-
-TEXTBOX
-195
-485
-345
-520
-C loss for respiration (Iguchi 2004): 2.5-4.9
-12
-0.0
-1
-
-TEXTBOX
-210
-525
-360
-555
-C loss for respiration (Iguchi 2004): 0.8-6.1
 12
 0.0
 1
 
 SLIDER
 15
-665
+635
 187
-698
+668
 krill_mortality
 krill_mortality
 0
@@ -1547,9 +1441,9 @@ TEXTBOX
 
 TEXTBOX
 15
-565
+535
 255
-591
+561
 ----------- Krill parameter -----------
 12
 0.0
@@ -1557,9 +1451,9 @@ TEXTBOX
 
 TEXTBOX
 195
-665
+635
 350
-706
+676
 daily mortality (Auerswald et al., 2015)
 12
 0.0
@@ -1598,9 +1492,9 @@ SA?
 
 SLIDER
 15
-585
+555
 247
-618
+588
 krill_halfsat
 krill_halfsat
 0
@@ -1613,10 +1507,10 @@ HORIZONTAL
 
 TEXTBOX
 255
-585
+555
 415
-620
-half saturation krill (Atkinson et al. 2006)
+590
+half saturation krill (Bahlburg et al. 2021)
 12
 0.0
 1
@@ -1629,7 +1523,7 @@ CHOOSER
 species
 species
 "krill" "salps" "both"
-1
+0
 
 TEXTBOX
 120
@@ -1680,10 +1574,10 @@ seed
 Number
 
 MONITOR
-955
-515
-1012
-560
+885
+465
+942
+510
 year
 floor (ticks / 365)
 0
@@ -1692,9 +1586,9 @@ floor (ticks / 365)
 
 SLIDER
 15
-750
+485
 187
-783
+518
 salp_grazing
 salp_grazing
 0
@@ -1704,6 +1598,16 @@ salp_grazing
 1
 NIL
 HORIZONTAL
+
+TEXTBOX
+195
+485
+345
+520
+salp grazing factor (Groeneveld et al. 2020)
+12
+0.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -2084,15 +1988,14 @@ NetLogo 6.2.1
     <setup>setup</setup>
     <go>go</go>
     <timeLimit steps="2160"/>
+    <metric>species</metric>
     <metric>chla_supply</metric>
     <metric>vegetation_delay</metric>
-    <metric>oozoid_respiration</metric>
     <metric>krill_amount</metric>
     <metric>chla_growth</metric>
     <metric>salp_immigration_probability</metric>
     <metric>salp_mortality</metric>
     <metric>krill_mortality</metric>
-    <metric>blastozoid_respiration</metric>
     <metric>salp_amount</metric>
     <metric>chla_decay</metric>
     <metric>salp_length</metric>
